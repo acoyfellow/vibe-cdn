@@ -66,6 +66,23 @@ declare module 'three' {
     constructor(params?: { color?: number | string; wireframe?: boolean; side?: number })
   }
   export const DoubleSide: number
+  export const ACESFilmicToneMapping: number
+  export const SRGBColorSpace: string
+}
+
+declare module 'three/examples/jsm/controls/OrbitControls.js' {
+  import type { PerspectiveCamera } from 'three'
+  export class OrbitControls {
+    constructor(camera: PerspectiveCamera, element: HTMLElement)
+    enableDamping: boolean
+    dampingFactor: number
+    rotateSpeed: number
+    minDistance: number
+    maxDistance: number
+    target: { set(x: number, y: number, z: number): void }
+    update(): void
+    dispose(): void
+  }
 }
 
 declare module 'three/examples/jsm/loaders/GLTFLoader.js' {

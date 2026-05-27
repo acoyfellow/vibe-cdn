@@ -11,12 +11,12 @@ export default defineConfig({
     host: '127.0.0.1',
     port: 5173,
     proxy: {
-      '/api': 'http://127.0.0.1:8788',
-      '/assets': 'http://127.0.0.1:8788',
-      '/manifest.json': 'http://127.0.0.1:8788',
-      '/health': 'http://127.0.0.1:8788',
+      '/api': 'http://127.0.0.1:8789',
+      '/assets': 'http://127.0.0.1:8789',
+      '/manifest.json': 'http://127.0.0.1:8789',
+      '/health': 'http://127.0.0.1:8789',
       '/ws': {
-        target: 'ws://127.0.0.1:8788',
+        target: 'ws://127.0.0.1:8789',
         ws: true,
       },
     },

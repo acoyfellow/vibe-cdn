@@ -38,7 +38,7 @@ let shuttingDown = false
 function parseArgs(argv: string[]): DemoOptions {
   const opt: DemoOptions = {
     open: true,
-    workerPort: 8788,
+    workerPort: 8789,
     appPort: 5173,
     skipMigrate: false,
     skipSeed: false,

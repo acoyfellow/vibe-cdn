@@ -7,7 +7,9 @@
  * Usage:
  *   bun scripts/seed-local.ts [--worker http://127.0.0.1:8787] [--skip-generate]
  */
-import { readFile } from 'node:fs/promises'
+import { createHash } from 'node:crypto'
+import { existsSync } from 'node:fs'
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -15,9 +17,18 @@ import { contentTypeForKey } from '../src/shared/mime'
 import type { AssetManifest } from '../src/shared/contracts'
 import { generateAll, type GeneratedFixture } from './gen-fixtures'
 
+const EXTERNAL_ASSETS: { key: string; localPath: string; sourceUrl: string }[] = [
+  {
+    key: 'demo/helmet.glb',
+    localPath: 'fixtures/external/DamagedHelmet.glb',
+    sourceUrl: 'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/DamagedHelmet/glTF-Binary/DamagedHelmet.glb',
+  },
+]
+
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = resolve(HERE, '..')
 const OUT_DIR = join(ROOT, 'fixtures', 'generated')
+void ROOT // also used below
 
 export type SeedOptions = {
   workerUrl: string
@@ -32,6 +43,30 @@ export type SeedResult = {
 
 export async function seedLocal(options: SeedOptions): Promise<SeedResult> {
   const fixtures: GeneratedFixture[] = options.skipGenerate ? await loadExisting() : await generateAll()
+
+  // Add externally-fetched demo assets (Khronos Damaged Helmet etc).
+  for (const ext of EXTERNAL_ASSETS) {
+    const absLocal = resolve(ROOT, ext.localPath)
+    if (!existsSync(absLocal)) {
+      await mkdir(dirname(absLocal), { recursive: true })
+      console.log(`fetching ${ext.key} ← ${ext.sourceUrl}`)
+      const response = await fetch(ext.sourceUrl)
+      if (!response.ok) {
+        console.warn(`skip ${ext.key}: fetch failed (${response.status})`)
+        continue
+      }
+      const bytes = new Uint8Array(await response.arrayBuffer())
+      await writeFile(absLocal, bytes)
+    }
+    const bytes = await readFile(absLocal)
+    fixtures.push({
+      key: ext.key,
+      path: absLocal,
+      bytes: bytes.byteLength,
+      sha256: createHash('sha256').update(bytes).digest('hex'),
+      contentType: contentTypeForKey(ext.key),
+    })
+  }
 
   const uploads: SeedResult['uploads'] = []
   for (const f of fixtures) {
@@ -96,7 +131,7 @@ async function loadExisting(): Promise<GeneratedFixture[]> {
 }
 
 function parseArgs(argv: string[]): SeedOptions {
-  let workerUrl = process.env.WORKER_URL ?? 'http://127.0.0.1:8788'
+  let workerUrl = process.env.WORKER_URL ?? 'http://127.0.0.1:8789'
   let skipGenerate = false
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]

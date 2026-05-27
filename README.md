@@ -4,6 +4,10 @@ A Cloudflare game stack for heavy browser games.
 
 R2 for big assets. Workers for the CDN edge. Durable Objects for rooms. D1 for scores. KV for saves.
 
+[![Live demo](https://img.shields.io/badge/demo-vibe--cdn.coey.dev-000000?style=for-the-badge)](https://vibe-cdn.coey.dev)
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/acoyfellow/vibe-cdn)
+[![MIT](https://img.shields.io/badge/license-MIT-blue?style=for-the-badge)](LICENSE)
+
 One command runs it all locally. No Cloudflare account required.
 
 ## Quick start
@@ -16,26 +20,27 @@ bun run demo
 Open <http://127.0.0.1:5173>. You should see seven panels:
 
 1. health check (which Cloudflare bindings are alive)
-2. a 3D model loading from local R2
-3. range-request stress test
-4. a real multiplayer lobby (open a second tab)
+2. a 3D PBR model loading from local R2 (Khronos "Damaged Helmet")
+3. range-request stress test against an 8 MiB asset
+4. a real multiplayer lobby (open a second tab to see two players)
 5. a leaderboard (D1)
 6. a save slot (KV)
 7. a cost estimator
+
+Live version is at <https://vibe-cdn.coey.dev> if you just want to look.
 
 If every status pill is green, the stack is working.
 
 ## What changes first
 
-Drop your own `.glb` here:
-
-```text
-fixtures/generated/demo/triangle.glb
-```
-
-Then:
+Replace the helmet with your own `.glb`. Two ways:
 
 ```bash
+# (a) optimize and upload an existing glb in one pass
+bun run optimize ./path/to/your-model.glb --upload
+
+# (b) drop a file in fixtures and re-seed
+cp ~/Downloads/your-model.glb fixtures/external/helmet.glb
 bun run seed
 ```
 

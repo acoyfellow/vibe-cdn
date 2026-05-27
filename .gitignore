@@ -6,6 +6,8 @@
 .wrangler
 app/dist
 dist
+fixtures/external/
 fixtures/generated
 fixtures/generated/
+fixtures/optimized/
 node_modules
