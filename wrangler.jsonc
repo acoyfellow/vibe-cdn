@@ -1,0 +1,53 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "vibe-cdn",
+  "main": "src/worker/index.ts",
+  "compatibility_date": "2026-04-17",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": "./app/dist",
+    "binding": "APP_ASSETS",
+    "not_found_handling": "single-page-application"
+  },
+  "vars": {
+    "ENVIRONMENT": "local",
+    "ALLOW_DEV_UPLOADS": "true"
+  },
+  "r2_buckets": [
+    {
+      "binding": "ASSETS",
+      "bucket_name": "vibe-cdn-assets"
+    }
+  ],
+  "kv_namespaces": [
+    {
+      "binding": "SAVES",
+      "id": "local-vibe-cdn-saves"
+    }
+  ],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "vibe-cdn-db",
+      "database_id": "local-vibe-cdn-db",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "LOBBY",
+        "class_name": "LobbyDO"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["LobbyDO"]
+    }
+  ],
+  "observability": {
+    "enabled": true
+  }
+}

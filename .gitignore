@@ -1,0 +1,10 @@
+*.log
+.DS_Store
+.dev.vars
+.local
+.wrangler
+app/dist
+dist
+fixtures/generated
+fixtures/generated/
+node_modules
