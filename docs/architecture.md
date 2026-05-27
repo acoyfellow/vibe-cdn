@@ -14,12 +14,12 @@ Five Cloudflare primitives, one Worker as the front door. Every box is a real pi
        ┌───────────────┐      ┌────────────────┐ ┌──────────┐ ┌──────────┐ ┌──────────────┐
        │   R2 bucket   │      │  Durable Object│ │    D1    │ │    KV    │ │  App assets  │
        │ vibe-cdn-     │      │     LobbyDO    │ │vibe-cdn- │ │  SAVES   │ │  (Pages-     │
-       │   assets      │      │                │ │   db     │ │          │ │  shape       │
-       │  .glb .ktx2   │      │  WebSocket     │ │  scores  │ │  saves   │ │  binding)    │
-       │  .bin .wasm   │      │  rooms,        │ │  table   │ │  blobs   │ │              │
+       │   assets      │      │                │ │   db     │ │  (cache, │ │  shape       │
+       │  .glb .ktx2   │      │  WebSocket     │ │  scores  │ │  flags,  │ │  binding)    │
+       │  .bin .wasm   │      │  rooms,        │ │  saves   │ │  cosmetics)││              │
        │               │      │  state-per-id  │ │          │ │          │ │              │
        └───────────────┘      └────────────────┘ └──────────┘ └──────────┘ └──────────────┘
-        big assets             multiplayer        scores       slots         SPA + UI
+        big assets             multiplayer        scores+saves  optional      SPA + UI
 ```
 
 ## Routes the Worker owns
@@ -112,14 +112,65 @@ POST /api/scores  body: { name, score }
 GET  /api/scores  → top 25
 ```
 
-Saves are JSON blobs in KV, namespaced by player and slot:
+Saves are JSON blobs in **D1**, keyed by `(player, slot)`:
 
-```text
-PUT /api/saves/:player/:slot  body: <any JSON>
-GET /api/saves/:player/:slot  → { ok, value }
+```sql
+CREATE TABLE saves (
+  player TEXT NOT NULL,
+  slot TEXT NOT NULL,
+  data TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (player, slot)
+);
 ```
 
-The Worker validates the body parses as JSON before writing, so the data layer never holds invalid payloads.
+```text
+PUT    /api/saves/:player/:slot  body: <any JSON>   → INSERT OR REPLACE
+GET    /api/saves/:player/:slot                     → { ok, value, updatedAt }
+DELETE /api/saves/:player/:slot                     → { ok, deleted }
+```
+
+### Why D1 and not KV for saves
+
+This is the question every new Cloudflare game dev has, and the answer matters
+because it's the difference between a save system that works and one that
+silently corrupts player progress.
+
+KV is **eventually consistent**:
+
+- Writes propagate globally within ~60 seconds.
+- Reads from the same edge as the write see new data quickly (~1 second).
+- Reads from a *different* edge can return stale data until propagation
+  catches up.
+
+The failure mode that actually hurts:
+
+```text
+1. player saves on phone       → PUT hits edge A (NYC)
+2. player walks out the door,
+   phone roams to wifi          → next requests route through edge B (closer)
+3. page refresh, auto-load      → GET on edge B returns the *previous* save
+4. game shows old state         → player loses progress
+```
+
+KV is the wrong primitive for anything where the user can lose data if they
+read their own write through a different edge.
+
+D1 is **strongly consistent globally** — reads always see committed writes,
+from any region. The schema is tiny, INSERT OR REPLACE handles upserts, and
+the cost at save-size volumes (~1 KB per save, write per level transition)
+is trivial.
+
+KV is still bound on the Worker (`env.SAVES`) because it remains the right
+primitive for:
+
+- Feature flags and A/B variant assignments
+- Session caches
+- Cosmetic / loadout caches that can tolerate brief staleness
+- Pre-baked edge-cached read-mostly data
+
+Use the primitive that matches the consistency requirement, not the one
+that sounds simplest.
 
 ## Local vs production
 

@@ -1,7 +1,7 @@
 import { getJson, putJson } from '../api'
 import { bigButton, el, logLine, makeStatus, panel, setStatus } from '../dom'
 
-type SaveResp = { ok: boolean; player: string; slot: string; value: unknown }
+type SaveResp = { ok: boolean; player: string; slot: string; value: unknown; updatedAt?: string | null }
 
 const PATH = '/api/saves/local/slot-a'
 
@@ -67,5 +67,9 @@ export function savesPanel(): HTMLElement {
 
   queueMicrotask(load)
 
-  return panel('6. Game saves (KV)', `PUT/GET ${PATH} as JSON. Try refreshing the page — it sticks.`, body)
+  return panel(
+    '6. Game saves (D1)',
+    `PUT/GET ${PATH} as JSON, backed by D1 for strong consistency. KV is the wrong primitive for game progress (eventually consistent reads can lose writes across edges) — D1 is global, strongly consistent, and cheap at save-size volumes.`,
+    body,
+  )
 }

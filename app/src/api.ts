@@ -57,6 +57,9 @@ export type RangeResult = {
   bytes: number
   acceptRanges: string | null
   contentRange: string | null
+  cacheStatus: string | null
+  cfRay: string | null
+  age: string | null
   error?: string
 }
 
@@ -80,6 +83,9 @@ export async function fetchRange(path: string, start: number, end: number): Prom
       bytes,
       acceptRanges: res.headers.get('accept-ranges'),
       contentRange: res.headers.get('content-range'),
+      cacheStatus: res.headers.get('cf-cache-status'),
+      cfRay: res.headers.get('cf-ray'),
+      age: res.headers.get('age'),
     }
   } catch (err) {
     return {
@@ -89,6 +95,9 @@ export async function fetchRange(path: string, start: number, end: number): Prom
       bytes: 0,
       acceptRanges: null,
       contentRange: null,
+      cacheStatus: null,
+      cfRay: null,
+      age: null,
       error: err instanceof Error ? err.message : String(err),
     }
   }

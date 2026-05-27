@@ -429,6 +429,37 @@ code, .mono {
 
 /* ── Range stress table ───────────────────────────────────────────────── */
 
+/* ── Range cache visualization bar ────────────────────────────────────── */
+
+.cache-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  margin: var(--space-2) 0 0;
+  padding: var(--space-2) 0;
+}
+
+.cache-cell {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--ink);
+  background: var(--canvas);
+  border-radius: 3px;
+}
+
+/* Cache status colors: MISS = empty (white), HIT = filled (black). All
+   intermediate states are typographic, not chromatic. */
+.cache-cell[data-cache="hit"]          { background: var(--ink); }
+.cache-cell[data-cache="miss"]         { background: var(--canvas); border-color: var(--text-soft); }
+.cache-cell[data-cache="expired"]      { background: repeating-linear-gradient(45deg, var(--ink) 0 3px, var(--canvas) 3px 6px); }
+.cache-cell[data-cache="revalidated"]  { background: repeating-linear-gradient(45deg, var(--ink) 0 5px, var(--canvas) 5px 10px); }
+.cache-cell[data-cache="updating"]     { background: var(--warning); border-color: var(--warning); }
+.cache-cell[data-cache="stale"]        { background: var(--text-soft); }
+.cache-cell[data-cache="bypass"]       { background: var(--canvas); border-style: dashed; }
+.cache-cell[data-cache="dynamic"]      { background: var(--canvas); border-style: dotted; }
+.cache-cell[data-cache="none"]         { background: var(--canvas); border-color: var(--hairline); }
+
 .range-table {
   width: 100%;
   border-collapse: collapse;

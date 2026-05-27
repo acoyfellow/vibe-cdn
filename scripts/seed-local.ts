@@ -19,6 +19,11 @@ import { generateAll, type GeneratedFixture } from './gen-fixtures'
 
 const EXTERNAL_ASSETS: { key: string; localPath: string; sourceUrl: string }[] = [
   {
+    key: 'demo/car.glb',
+    localPath: 'fixtures/external/ferrari.glb',
+    sourceUrl: 'https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/models/gltf/ferrari.glb',
+  },
+  {
     key: 'demo/helmet.glb',
     localPath: 'fixtures/external/DamagedHelmet.glb',
     sourceUrl: 'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/DamagedHelmet/glTF-Binary/DamagedHelmet.glb',
