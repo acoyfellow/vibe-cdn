@@ -1,0 +1,73 @@
+{
+  "schema": "guardrail.deploy-receipt.v0",
+  "timestamp": "2026-05-27T19:58:03.504Z",
+  "command": [
+    "wrangler",
+    "deploy",
+    "--env",
+    "production"
+  ],
+  "configPath": "/Users/jcoeyman/cloudflare/vibe-cdn/wrangler.jsonc",
+  "git": {
+    "sha": "e5699960409debe79c06300be41cb7a18392eeca",
+    "dirty": true,
+    "remote": "https://github.com/acoyfellow/vibe-cdn.git"
+  },
+  "decision": {
+    "allowed": true,
+    "findings": [
+      {
+        "severity": "WARNING",
+        "message": "workers_dev not set (defaults to true) — Worker will be public with sensitive bindings"
+      },
+      {
+        "severity": "WARNING",
+        "message": "kv_namespace binding \"SAVES\" exposed on workers.dev URL"
+      },
+      {
+        "severity": "WARNING",
+        "message": "d1 binding \"DB\" exposed on workers.dev URL"
+      },
+      {
+        "severity": "WARNING",
+        "message": "r2_bucket binding \"ASSETS\" exposed on workers.dev URL"
+      },
+      {
+        "severity": "WARNING",
+        "message": "durable_object_namespace binding \"LOBBY\" exposed on workers.dev URL"
+      }
+    ]
+  },
+  "exposure": {
+    "isPublic": true,
+    "surface": "workers.dev URL",
+    "reason": "workers_dev not set (defaults to true)",
+    "criticalMessage": "workers_dev not set (defaults to true) — Worker will be public with sensitive bindings",
+    "routes": [],
+    "workersDev": true
+  },
+  "bindings": [
+    {
+      "type": "kv_namespace",
+      "name": "SAVES"
+    },
+    {
+      "type": "d1",
+      "name": "DB"
+    },
+    {
+      "type": "r2_bucket",
+      "name": "ASSETS"
+    },
+    {
+      "type": "durable_object_namespace",
+      "name": "LOBBY"
+    }
+  ],
+  "auth": {
+    "detected": false,
+    "partial": false,
+    "patterns": [],
+    "source": "/Users/jcoeyman/cloudflare/vibe-cdn/src/worker/index.ts"
+  }
+}

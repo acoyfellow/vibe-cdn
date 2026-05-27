@@ -22,14 +22,14 @@
   "kv_namespaces": [
     {
       "binding": "SAVES",
-      "id": "local-vibe-cdn-saves"
+      "id": "56167bf76c4446d8ac96248404ff4ae6"
     }
   ],
   "d1_databases": [
     {
       "binding": "DB",
       "database_name": "vibe-cdn-db",
-      "database_id": "local-vibe-cdn-db",
+      "database_id": "ddbfc928-8773-487e-9902-b878f70bd1d8",
       "migrations_dir": "migrations"
     }
   ],
@@ -49,5 +49,46 @@
   ],
   "observability": {
     "enabled": true
+  },
+  "env": {
+    "production": {
+      "name": "vibe-cdn",
+      "account_id": "bfcb6ac5b3ceaf42a09607f6f7925823",
+      "vars": {
+        "ENVIRONMENT": "production",
+        "ALLOW_DEV_UPLOADS": "false"
+      },
+      "routes": [
+        { "pattern": "vibe-cdn.coey.dev", "custom_domain": true }
+      ],
+      "r2_buckets": [
+        { "binding": "ASSETS", "bucket_name": "vibe-cdn-assets" }
+      ],
+      "kv_namespaces": [
+        { "binding": "SAVES", "id": "56167bf76c4446d8ac96248404ff4ae6" }
+      ],
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "vibe-cdn-db",
+          "database_id": "ddbfc928-8773-487e-9902-b878f70bd1d8",
+          "migrations_dir": "migrations"
+        }
+      ],
+      "durable_objects": {
+        "bindings": [
+          { "name": "LOBBY", "class_name": "LobbyDO" }
+        ]
+      },
+      "migrations": [
+        { "tag": "v1", "new_sqlite_classes": ["LobbyDO"] }
+      ],
+      "assets": {
+        "directory": "./app/dist",
+        "binding": "APP_ASSETS",
+        "not_found_handling": "single-page-application"
+      },
+      "observability": { "enabled": true }
+    }
   }
 }

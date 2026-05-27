@@ -22,7 +22,7 @@ const header = el('header', {
       class: 'app-head-row',
       children: [
         el('h1', { text: 'vibe-cdn' }),
-        el('span', { class: 'tag', text: '0.0.1 local' }),
+        el('span', { class: 'tag', text: '0.0.1' }),
       ],
     }),
     el('p', {
