@@ -1,99 +1,145 @@
 # vibe-cdn
 
-A Cloudflare game stack for heavy browser games.
-
-R2 for big assets. Workers for the CDN edge. Durable Objects for rooms. D1 for scores. KV for saves.
+> Your browser game's assets on Cloudflare's edge. R2 for the heavy stuff, Workers for the CDN, free egress at any scale.
 
 [![Live demo](https://img.shields.io/badge/demo-vibe--cdn.coey.dev-000000?style=for-the-badge)](https://vibe-cdn.coey.dev)
 [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/acoyfellow/vibe-cdn)
 [![MIT](https://img.shields.io/badge/license-MIT-blue?style=for-the-badge)](LICENSE)
 
-One command runs it all locally. No Cloudflare account required.
+![Drag a .glb onto the page and get back a public, edge-cached URL.](docs/screenshots/hero.png)
+
+Drag any `.glb` onto the page. Get back a public, edge-cached URL on Cloudflare's edge in a single round trip.
+
+![Upload success: short URL, copy button, sha, expiry, paste-ready Three.js snippet.](docs/screenshots/uploaded.png)
 
 ## Quick start
 
 ```bash
+git clone https://github.com/acoyfellow/vibe-cdn
+cd vibe-cdn
 bun install
 bun run demo
 ```
 
-Open <http://127.0.0.1:5173>. You should see seven panels:
+Open the URL it prints. The page is the product:
 
-1. health check (which Cloudflare bindings are alive)
-2. a 3D PBR model loading from local R2 (Khronos "Damaged Helmet")
-3. range-request stress test against an 8 MiB asset
-4. a real multiplayer lobby (open a second tab to see two players)
-5. a leaderboard (D1)
-6. a save slot (KV)
-7. a cost estimator
+- a **live stats ticker** counting real assets, requests, scores, saves
+- a **drop zone** that accepts your model and gives back an edge-cached URL
+- seven **receipts panels** below — every primitive on the stack, wired, probed, and clickable
 
-Live version is at <https://vibe-cdn.coey.dev> if you just want to look.
+No Cloudflare account required for the local run.
 
-If every status pill is green, the stack is working.
+## What's in the box
+
+| Primitive          | Used for                                  | Endpoint                          |
+|--------------------|-------------------------------------------|-----------------------------------|
+| **R2 (assets)**    | Big, immutable, content-addressable files | `/assets/:key`, `/manifest.json`  |
+| **R2 (uploads)**   | Public ephemeral drops (24-hour TTL)      | `POST /api/u`, `/u/:key`          |
+| **Workers**        | The CDN edge: MIME, Range, ETag, CORS     | every route above                 |
+| **Durable Object** | Multiplayer rooms over WebSocket          | `/ws/lobby/:id`                   |
+| **D1**             | Leaderboards + game saves                 | `/api/scores`, `/api/saves/...`   |
+| **KV**             | Per-IP rate limits, edge caches           | (bound, used internally)          |
+| **Live stats**     | Aggregated counts from the bindings       | `/api/stats`                      |
+| **Cost model**     | Pure math, paid sliders to play with      | `/api/cost/estimate`              |
 
 ## What changes first
 
-Replace the helmet with your own `.glb`. Two ways:
+Drop your own `.glb` in the page hero. You'll get a URL like `https://vibe-cdn.coey.dev/u/k7x2pq.glb` and a paste-ready Three.js snippet.
+
+For permanent assets (no 24-hour expiry):
 
 ```bash
-# (a) optimize and upload an existing glb in one pass
-bun run optimize ./path/to/your-model.glb --upload
-
-# (b) drop a file in fixtures and re-seed
-cp ~/Downloads/your-model.glb fixtures/external/helmet.glb
-bun run seed
+# put a glb into the permanent R2 bucket
+wrangler r2 object put vibe-cdn-assets/demo/your-model.glb --file ./your-model.glb \
+  --content-type model/gltf-binary \
+  --cache-control 'public, max-age=31536000, immutable'
 ```
 
-Refresh the page. The model panel now shows your model. That is the whole golden loop.
+Or optimize first:
 
-## What this gives you
+```bash
+bun run optimize ./your-model.glb       # dedup + prune + texture compress
+# → ~30% size reduction without optional Draco/Meshopt/KTX2 encoders
+```
 
-- An R2-backed Worker route at `/assets/:key` with:
-  - Correct MIME types for `.glb`, `.gltf`, `.ktx2`, `.wasm`, audio, video, images
-  - `Cache-Control: public, max-age=31536000, immutable`
-  - `Accept-Ranges: bytes`, real `206 Partial Content` for `Range:` requests
-  - ETag + `If-None-Match` -> `304 Not Modified`
-  - Open CORS (game clients can fetch from anywhere)
-- A Durable Object lobby at `/ws/lobby/:id` for WebSocket multiplayer
-- A D1 leaderboard at `/api/scores`
-- A KV save-slot endpoint at `/api/saves/:player/:slot`
-- A small cost estimator at `/api/cost/estimate`
-- A shared `__manifest.json` so the client knows what is in the bucket
+## How the asset path works
+
+```text
+GET /assets/demo/helmet.glb
+    Range: bytes=0-1048575
+
+1. Cloudflare edge:  cache lookup against the immutable URL
+   HIT  → 206 from cache, never touches your Worker
+   MISS → forward to Worker
+
+2. Worker:
+   R2.head(key) for size + ETag
+   resolve Range against size
+   R2.get(key, { range }) for bytes
+   write headers:
+     content-range: bytes 0-1048575/3773916
+     content-type:  model/gltf-binary
+     cache-control: public, max-age=31536000, immutable
+     accept-ranges: bytes
+     etag:          "abc123"
+   → 206 Partial Content
+
+3. Browser: Three.js GLTFLoader parses the bytes.
+   Subsequent edge hits never touch R2 again.
+```
+
+R2 has **no egress fees**. Once an immutable URL is warm at an edge, all delivery from that edge is free. This is the magic.
 
 ## Commands
 
 ```bash
-bun run demo       # the golden path: migrate + worker + seed + app
-bun run smoke      # run end-to-end checks against the local worker
-bun run check      # typecheck everything
-bun run build      # build app + dry-run worker deploy
+bun run demo       # the whole flow: migrate, start worker, seed, start app
+bun run dev:app    # vite only
+bun run dev:worker # wrangler only
 bun run seed       # regenerate fixtures and re-upload to local R2
-bun run deploy     # push to your Cloudflare account (see docs/deploy.md)
+bun run optimize   # gltf-transform pipeline on a glb
+bun run smoke      # end-to-end checks against the local worker
+bun run check      # typecheck
+bun run build      # build app + dry-run worker deploy
+bun run deploy     # ship to your Cloudflare account
 ```
 
-## More docs
-
-- [`docs/architecture.md`](docs/architecture.md) — every route, every primitive, every diagram.
-- [`docs/costs.md`](docs/costs.md) — how the math works at 1k, 50k, 5M players.
-- [`docs/deploy.md`](docs/deploy.md) — bootstrap your Cloudflare account in one pass.
-
-## Deploy
-
-Local first. When you are ready to put this on the internet, see [`docs/deploy.md`](docs/deploy.md). The shape is:
+## Deploy your own
 
 ```bash
+# 1. Bootstrap: create the bindings on your account
 wrangler r2 bucket create vibe-cdn-assets
+wrangler r2 bucket create vibe-cdn-uploads
+wrangler r2 bucket lifecycle add vibe-cdn-uploads --id ttl --expire-days 1
 wrangler d1 create vibe-cdn-db
 wrangler kv namespace create SAVES
+
+# 2. Paste the printed IDs into wrangler.jsonc under env.production.
+
+# 3. Migrate the schema and ship.
+wrangler d1 migrations apply vibe-cdn-db --remote
 bun run deploy
 ```
 
+Or click the [Deploy to Cloudflare](https://deploy.workers.cloudflare.com/?url=https://github.com/acoyfellow/vibe-cdn) button and Cloudflare provisions everything for you.
+
+## More docs
+
+- [`docs/architecture.md`](docs/architecture.md) — every route, every primitive, every diagram
+- [`docs/costs.md`](docs/costs.md) — 1k / 50k / 5M player cost scenarios with line items
+- [`docs/deploy.md`](docs/deploy.md) — production deploy guide
+- [`docs/screenshots/`](docs/screenshots/) — drop zone, hero, snippet panel
+
 ## Why this exists
 
-Big browser games (Three.js, WebGPU, cloth sim, racing games) hit a wall at "how do I serve a 200 MB asset bundle without going broke?". R2 has no egress fee, Workers add the cache and routing, Durable Objects do rooms, D1 does scores. This repo bundles those pieces into one starter you can read top to bottom and copy a piece at a time.
+Browser games (Three.js, WebGPU, cloth sims, racing games) hit the same wall at the same scale: "how do I serve a 200 MB asset bundle without going broke?"
+
+Most CDNs charge per-GB egress. A viral browser game on a per-GB CDN can cost five figures a month. R2 has no egress, Workers handle the cache and routing, Durable Objects do rooms, D1 does scores. Same stack, fractional pennies at scale.
+
+This repo bundles those primitives into one starter you can clone, deploy, and ship a game on the same day.
 
 ## Status
 
-0.0.1, local-tested. Built to be forked. MIT.
+`0.1.0`. Local-tested. Production-tested at https://vibe-cdn.coey.dev.
 
-Built by [@acoyfellow](https://x.com/acoyfellow). Inspired by friends building real things in the open.
+MIT. Built by [@acoyfellow](https://x.com/acoyfellow).

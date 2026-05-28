@@ -7,8 +7,8 @@
   "scripts": {
     "demo": "bun scripts/demo.ts",
     "dev": "bun scripts/demo.ts --no-open",
-    "dev:worker": "wrangler dev --local --persist-to .wrangler/state --port 9787",
-    "dev:app": "vite --host 127.0.0.1 --port 5173",
+    "dev:worker": "wrangler dev --local --persist-to .wrangler/state --port 4783",
+    "dev:app": "vite --host 127.0.0.1 --port 5374",
     "seed": "bun scripts/seed-local.ts",
     "smoke": "bun scripts/smoke.ts",
     "optimize": "bun scripts/optimize.ts",

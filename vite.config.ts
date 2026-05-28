@@ -9,14 +9,14 @@ export default defineConfig({
   },
   server: {
     host: '127.0.0.1',
-    port: 5173,
+    port: 5374,
     proxy: {
-      '/api': 'http://127.0.0.1:9787',
-      '/assets': 'http://127.0.0.1:9787',
-      '/manifest.json': 'http://127.0.0.1:9787',
-      '/health': 'http://127.0.0.1:9787',
+      '/api': 'http://127.0.0.1:4783',
+      '/assets': 'http://127.0.0.1:4783',
+      '/manifest.json': 'http://127.0.0.1:4783',
+      '/health': 'http://127.0.0.1:4783',
       '/ws': {
-        target: 'ws://127.0.0.1:9787',
+        target: 'ws://127.0.0.1:4783',
         ws: true,
       },
     },

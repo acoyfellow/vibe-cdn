@@ -5,13 +5,13 @@
  *   2. Start `wrangler dev` (worker on :8787) in the background.
  *   3. Poll /health until ready.
  *   4. Generate fixtures and seed R2/KV/manifest.
- *   5. Start `vite` (app on :5173) in the background.
+ *   5. Start `vite` (app on :5374) in the background.
  *   6. Print the demo URL and optionally open the browser.
  *
  * Flags:
  *   --no-open         do not auto-open the browser
  *   --worker-port N   override worker port (default 8787)
- *   --app-port N      override vite port (default 5173)
+ *   --app-port N      override vite port (default 5374)
  *   --skip-migrate    skip d1 migrations
  *   --skip-seed       skip fixture generation + seeding
  *   --skip-app        do not start vite (worker-only demo)
@@ -38,8 +38,8 @@ let shuttingDown = false
 function parseArgs(argv: string[]): DemoOptions {
   const opt: DemoOptions = {
     open: true,
-    workerPort: 9787,
-    appPort: 5173,
+    workerPort: 4783,
+    appPort: 5374,
     skipMigrate: false,
     skipSeed: false,
     skipApp: false,
