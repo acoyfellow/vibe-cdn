@@ -82,7 +82,7 @@ export function leaderboardPanel(): HTMLElement {
 
   return panel(
     '5. Leaderboard (D1)',
-    'Lap times from the Mini Race above land here automatically, scored so faster laps rank higher. POST your own to /api/scores to join the leaderboard.',
+    'Top speeds achieved in the Mini Arena above land here automatically. Higher is better. POST your own to /api/scores to join from anywhere.',
     body,
   )
 }

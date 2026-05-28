@@ -1,15 +1,13 @@
-// Mini Race — the unifying demo.
+// Mini Arena — the unifying demo.
 //
-// One panel that exercises: R2 (the Ferrari GLB), Workers (the CDN),
-// Durable Objects (the lobby), D1 (lap times), and the live page (every
-// visitor sees every other visitor as a ghost car).
+// Open arena instead of a forced ring track. Drop the Ferrari onto a wide
+// gridded plane and drive freely with WASD. Every visitor to this URL
+// shares the same Durable Object room and sees the others as ghost cars
+// synced at 20 Hz with snapshot interpolation.
 //
-// Per the dossier in docs/_mini-race-notes.md:
-//   - WASD car heading + throttle, chase camera (no PointerLockControls).
-//   - Procedural CatmullRomCurve3 ribbon track in the XZ plane.
-//   - Start-line crossing with direction check + halfway checkpoint.
-//   - 20 Hz `move` send rate, snapshot interpolation at 150ms delay.
-//   - Server tick rate is also 20 Hz; we read the `state` messages.
+// Until the visitor takes the wheel, the car ambient-drives a slow lazy
+// figure-8 in the center of the arena. Press any movement key and you
+// take over. Top speed achieved this session is the leaderboard score.
 
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
@@ -22,33 +20,33 @@ import type {
 import { bigButton, el, logLine, makeStatus, panel, setStatus } from '../dom'
 
 const CAR_ASSET = '/assets/demo/car.glb'
-const LOBBY_PATH = '/ws/lobby/race'
+const LOBBY_PATH = '/ws/lobby/arena'
 const SEND_HZ = 20
 const SEND_MS = 1000 / SEND_HZ
 const INTERP_DELAY_MS = 150
-const MAX_SPEED = 24
-const ACCEL = 14
-const REVERSE_ACCEL = 8
-const TURN_RATE = 1.8
-const DRAG = 0.8
+const MAX_SPEED = 30
+const ACCEL = 16
+const REVERSE_ACCEL = 10
+const TURN_RATE = 2.2
+const DRAG = 0.9
+const ARENA_HALF = 120          // half-width of the arena floor in meters
+const TOP_SPEED_POST_THRESHOLD = 2 // only post when top speed improves by 2 mph
 
 export function racePanel(): HTMLElement {
-  const status = makeStatus('busy', 'connecting…')
+  const status = makeStatus('busy', 'loading…')
   const log = el('div', { class: 'log' })
   const stage = el('div', { class: 'gltf-stage race-stage' })
 
-  // HUD overlay
+  // HUD overlay (no lap timer — open arena)
   const hudSpeed = el('span', { class: 'hud-val mono', text: '0' })
-  const hudLap = el('span', { class: 'hud-val mono', text: '0' })
-  const hudBestLap = el('span', { class: 'hud-val mono', text: '—' })
+  const hudTopSpeed = el('span', { class: 'hud-val mono', text: '0' })
   const hudPlayers = el('span', { class: 'hud-val mono', text: '0' })
   const hudPing = el('span', { class: 'hud-val mono', text: '— ms' })
   const hud = el('div', {
     class: 'race-hud',
     children: [
       hudCell('speed', hudSpeed, 'mph-ish'),
-      hudCell('lap', hudLap, ''),
-      hudCell('best', hudBestLap, 'seconds'),
+      hudCell('top speed', hudTopSpeed, 'this session'),
       hudCell('players', hudPlayers, 'online'),
       hudCell('ping', hudPing, ''),
     ],
@@ -71,28 +69,24 @@ export function racePanel(): HTMLElement {
   renderer.setClearColor(0x000000, 1)
   stage.appendChild(renderer.domElement)
 
-  scene.add(new THREE.AmbientLight(0xffffff, 0.3))
+  scene.add(new THREE.AmbientLight(0xffffff, 0.4))
   const sun = new THREE.DirectionalLight(0xffffff, 1.5)
-  sun.position.set(50, 80, 30)
+  sun.position.set(60, 100, 40)
   scene.add(sun as unknown as object)
-  const fill = new THREE.DirectionalLight(0x99ccff, 0.45)
-  fill.position.set(-30, 50, -20)
+  const fill = new THREE.DirectionalLight(0x99ccff, 0.4)
+  fill.position.set(-40, 60, -30)
   scene.add(fill as unknown as object)
 
-  // Track
-  const { mesh: trackMesh, curve, startLine, halfway } = buildTrack()
-  scene.add(trackMesh as unknown as object)
+  // The arena floor — a large flat plane with a procedural grid texture.
+  scene.add(buildArenaFloor() as unknown as object)
 
-  // Start-line strip (visual)
-  scene.add(buildLineMarker(startLine.a, startLine.b, 0xffe000) as unknown as object)
+  // A subtle origin marker so the arena has a visual anchor.
+  scene.add(buildOriginMarker() as unknown as object)
 
-  // The player's car (filled in after GLB loads)
+  // The player's car (filled in after GLB loads).
   const carGroup = new THREE.Group()
-  curve.getPointAt(0.001, carGroup.position as unknown as THREE.Vector3)
-  // face along the curve's forward direction
-  const startTangent = new THREE.Vector3()
-  curve.getTangentAt(0.001, startTangent)
-  carGroup.rotation.y = Math.atan2(startTangent.x, startTangent.z)
+  carGroup.position.set(0, 0, 0)
+  carGroup.rotation.y = 0
   scene.add(carGroup as unknown as object)
 
   // Ghost cars: rendered placeholders + snapshot buffers per remote id.
@@ -102,10 +96,8 @@ export function racePanel(): HTMLElement {
   // ── State ─────────────────────────────────────────────────────────────
   const keys = { w: false, a: false, s: false, d: false }
   let speed = 0
-  let lap = 0
-  let bestLapMs: number | null = null
-  let lapStartedAt = performance.now()
-  let passedHalf = false
+  let topSpeed = 0
+  let lastPostedTopSpeed = 0
   let myId: string | null = null
   let socket: WebSocket | null = null
   let seq = 0
@@ -116,19 +108,16 @@ export function racePanel(): HTMLElement {
   let lastFrameAt = performance.now()
   let userHasDriven = false
   let idleStartedAt = performance.now()
-  const prevCarPos = new THREE.Vector3()
-  const motionVec = new THREE.Vector3()
   const carForward = new THREE.Vector3()
   const camOffset = new THREE.Vector3(0, 4.0, -8.0)
   const camTmp = new THREE.Vector3()
   const lookTmp = new THREE.Vector3()
+  const ghostTmp = new THREE.Vector3()
 
   // ── Loading ───────────────────────────────────────────────────────────
   const loadCar = async () => {
     setStatus(status, 'busy', 'loading car…')
     const loader = new GLTFLoader()
-    // The Ferrari uses Draco-compressed geometry. Decoder served from
-    // Google's CDN keeps the demo zero-config.
     const draco = new DRACOLoader()
     draco.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.7/')
     loader.setDRACOLoader(draco)
@@ -137,7 +126,7 @@ export function racePanel(): HTMLElement {
       CAR_ASSET,
       (gltf) => {
         const root = gltf.scene
-        // Normalize: scale so the car is ~3 units long, oriented to face +Z.
+        // Normalize: scale so the car is ~3 units long.
         const box = new THREE.Box3().setFromObject(root)
         const size = box.getSize(new THREE.Vector3())
         const maxDim = Math.max(size.x, size.y, size.z) || 1
@@ -146,13 +135,10 @@ export function racePanel(): HTMLElement {
         root.position.set(0, 0, 0)
 
         carTemplate = root
-        // Mount a clone as the player's car
         const playerCar = (root as unknown as { clone: (deep?: boolean) => THREE.Object3D }).clone(true)
-        ;(carGroup as unknown as { add(child: unknown): void }).add(playerCar)
-        prevCarPos.copy(carGroup.position as unknown as THREE.Vector3)
+        carGroup.add(playerCar)
 
-        // Snap the camera to a flattering pre-position so the first frame
-        // shows the car on the track, not the inside of the origin.
+        // Snap the camera so the first frame is a flattering chase shot.
         camTmp.copy(camOffset).applyQuaternion(carGroup.quaternion)
         camTmp.add(carGroup.position)
         camera.position.copy(camTmp)
@@ -162,16 +148,17 @@ export function racePanel(): HTMLElement {
 
         const ms = Math.round(performance.now() - t0)
         logLine(log, `loaded ${CAR_ASSET} in ${ms} ms`, 'ok')
-        setStatus(status, 'ok', `ready — WASD to drive`)
+        setStatus(status, 'ok', 'ready — WASD to drive')
         idleStartedAt = performance.now()
         connect()
       },
       undefined,
       (err: unknown) => {
         setStatus(status, 'fail', 'load failed')
-        const msg = err && typeof err === 'object' && 'message' in err
-          ? String((err as { message?: unknown }).message)
-          : String(err)
+        const msg =
+          err && typeof err === 'object' && 'message' in err
+            ? String((err as { message?: unknown }).message)
+            : String(err)
         logLine(log, `GLTFLoader: ${msg}`, 'fail')
       },
     )
@@ -195,7 +182,7 @@ export function racePanel(): HTMLElement {
       const name = nameInput.value.trim() || 'racer'
       send({ type: 'join', name })
       pingTimer = window.setInterval(() => send({ type: 'ping', t: Date.now() }), 1000)
-      logLine(log, `lobby connected`, 'ok')
+      logLine(log, 'lobby connected', 'ok')
     })
 
     ws.addEventListener('message', (ev) => {
@@ -221,9 +208,9 @@ export function racePanel(): HTMLElement {
         clearInterval(pingTimer)
         pingTimer = null
       }
-      logLine(log, `lobby closed`, 'info')
+      logLine(log, 'lobby closed', 'info')
     })
-    ws.addEventListener('error', () => logLine(log, `socket error`, 'fail'))
+    ws.addEventListener('error', () => logLine(log, 'socket error', 'fail'))
   }
 
   const disconnect = () => {
@@ -240,7 +227,7 @@ export function racePanel(): HTMLElement {
       socket = null
     }
     for (const [, g] of ghosts) {
-      ;(scene as unknown as { remove(child: unknown): void }).remove(g.mesh)
+      scene.remove(g.mesh)
     }
     ghosts.clear()
     hudPlayers.textContent = '0'
@@ -260,22 +247,21 @@ export function racePanel(): HTMLElement {
       if (!ghost) {
         if (!carTemplate) continue
         const mesh = (carTemplate as unknown as { clone: (deep?: boolean) => THREE.Object3D }).clone(true)
-        // tint ghosts faintly so they're distinguishable (just position offset)
-        ;(scene as unknown as { add(child: unknown): void }).add(mesh)
-        ghost = { mesh, buffer: [], lap: p.lap ?? 0 }
+        scene.add(mesh)
+        ghost = { mesh, buffer: [] }
         ghosts.set(p.id, ghost)
       }
-      ghost.lap = p.lap ?? 0
       ghost.buffer.push({ t: tNow, x: p.x, y: p.y, z: p.z, ry: p.ry })
       const cutoff = tNow - INTERP_DELAY_MS * 4
       while (ghost.buffer.length > 2 && (ghost.buffer[1]?.t ?? 0) < cutoff) ghost.buffer.shift()
     }
     for (const [id, ghost] of ghosts) {
       if (!seen.has(id)) {
-        ;(scene as unknown as { remove(child: unknown): void }).remove(ghost.mesh)
+        scene.remove(ghost.mesh)
         ghosts.delete(id)
       }
     }
+    // HUD reflects *all* players in the room including us.
     hudPlayers.textContent = String(players.length)
   }
 
@@ -303,7 +289,8 @@ export function racePanel(): HTMLElement {
     const dt = Math.min(0.05, (now - lastFrameAt) / 1000)
     lastFrameAt = now
     updateCar(dt)
-    checkLap()
+    clampToArena()
+    trackTopSpeed()
     updateCamera()
     interpolateGhosts(now)
     maybeSendMove(now)
@@ -312,9 +299,6 @@ export function racePanel(): HTMLElement {
   }
 
   const updateCar = (dt: number) => {
-    // Ambient idle: until the user presses anything, the car cruises forward
-    // at a gentle speed along the track curve. This means the page is alive
-    // the moment a visitor lands.
     const anyKey = keys.w || keys.a || keys.s || keys.d
     if (anyKey && !userHasDriven) userHasDriven = true
     if (!userHasDriven) {
@@ -323,102 +307,87 @@ export function racePanel(): HTMLElement {
     }
     if (keys.w) speed += ACCEL * dt
     if (keys.s) speed -= REVERSE_ACCEL * dt
-    // Drag — strong when no input, light when accelerating.
     const drag = (keys.w || keys.s) ? DRAG * 0.2 : DRAG
     if (Math.abs(speed) > 0.01) speed -= Math.sign(speed) * drag * dt * Math.abs(speed)
     speed = Math.max(-MAX_SPEED * 0.5, Math.min(MAX_SPEED, speed))
 
     const steer = (keys.a ? 1 : 0) - (keys.d ? 1 : 0)
-    // Only turn when moving.
     if (Math.abs(speed) > 0.05) {
       carGroup.rotation.y += steer * TURN_RATE * dt * (speed / MAX_SPEED)
     }
-    // forward = local -Z rotated by yaw
     carForward.set(Math.sin(carGroup.rotation.y), 0, Math.cos(carGroup.rotation.y))
-    ;(carGroup.position as unknown as { x: number; z: number }).x += carForward.x * speed * dt
-    ;(carGroup.position as unknown as { x: number; z: number }).z += carForward.z * speed * dt
+    carGroup.position.x += carForward.x * speed * dt
+    carGroup.position.z += carForward.z * speed * dt
 
-    // HUD
     hudSpeed.textContent = String(Math.round(Math.abs(speed) * 2.2))
-    hudLap.textContent = String(lap)
   }
 
-  const checkLap = () => {
-    motionVec.subVectors(carGroup.position as unknown as THREE.Vector3, prevCarPos)
-    if (motionVec.lengthSq() > 1e-6) {
-      // Halfway gate
-      if (!passedHalf && segmentsCrossXZ(prevCarPos, carGroup.position as unknown as THREE.Vector3, halfway.a, halfway.b)) {
-        passedHalf = true
-      }
-      // Start/finish line crossing — only counts if we've cleared halfway AND moving in track-forward direction.
-      const aligned = motionVec.dot(startLine.forward) > 0
-      if (passedHalf && aligned && segmentsCrossXZ(prevCarPos, carGroup.position as unknown as THREE.Vector3, startLine.a, startLine.b)) {
-        const now = performance.now()
-        const lapMs = Math.round(now - lapStartedAt)
-        lap++
-        passedHalf = false
-        lapStartedAt = now
-        if (bestLapMs === null || lapMs < bestLapMs) {
-          bestLapMs = lapMs
-          hudBestLap.textContent = (lapMs / 1000).toFixed(2)
-        }
-        send({ type: 'lap', lap, lastLapMs: lapMs })
-        logLine(log, `lap ${lap} — ${(lapMs / 1000).toFixed(2)}s`, 'ok')
-        // Post the lap to the global leaderboard. Score is encoded so faster
-        // laps rank higher (existing /api/scores sorts DESC by score). The
-        // leaderboard panel decodes the time for display.
-        void postLap(nameInput.value.trim() || 'racer', lapMs)
-      }
-    }
-    prevCarPos.copy(carGroup.position as unknown as THREE.Vector3)
-  }
-
+  // Slow lazy figure-8 around the origin — so the page is alive on first load.
   const idleCruise = (dt: number) => {
-    // Sample a point ~12 units ahead of where we are on the curve, then
-    // steer toward it. Speed glides to a comfortable cruise.
-    const seconds = (performance.now() - idleStartedAt) / 1000
-    const t = (seconds * 0.005) % 1 // 200s lap in idle
-    const aheadT = (t + 0.002) % 1
-    const target = new THREE.Vector3()
-    curve.getPointAt(aheadT, target)
-    const targetYaw = Math.atan2(
-      target.x - carGroup.position.x,
-      target.z - carGroup.position.z,
-    )
-    // shortest-arc lerp toward target yaw
-    let dy = targetYaw - carGroup.rotation.y
-    if (dy > Math.PI) dy -= Math.PI * 2
-    if (dy < -Math.PI) dy += Math.PI * 2
-    carGroup.rotation.y += dy * Math.min(1, dt * 2.5)
-    // ramp speed up gently to ~8 m/s
-    speed += (8 - speed) * Math.min(1, dt * 0.6)
+    const tSec = (performance.now() - idleStartedAt) / 1000
+    // Lissajous-style figure-8: x = A sin(ωt), z = A sin(2ωt)/2
+    const A = 35
+    const W = 0.12
+    const targetX = A * Math.sin(W * tSec)
+    const targetZ = (A / 2) * Math.sin(2 * W * tSec)
+    const dx = targetX - carGroup.position.x
+    const dz = targetZ - carGroup.position.z
+    const dist = Math.hypot(dx, dz)
+    if (dist > 0.01) {
+      const targetYaw = Math.atan2(dx, dz)
+      let dy = targetYaw - carGroup.rotation.y
+      if (dy > Math.PI) dy -= Math.PI * 2
+      if (dy < -Math.PI) dy += Math.PI * 2
+      carGroup.rotation.y += dy * Math.min(1, dt * 2.5)
+    }
+    speed += (10 - speed) * Math.min(1, dt * 0.6)
     carForward.set(Math.sin(carGroup.rotation.y), 0, Math.cos(carGroup.rotation.y))
     carGroup.position.x += carForward.x * speed * dt
     carGroup.position.z += carForward.z * speed * dt
     hudSpeed.textContent = String(Math.round(Math.abs(speed) * 2.2))
-    hudLap.textContent = String(lap)
+  }
+
+  // Hard-clamp the car inside the arena so it can't tumble off the floor.
+  const clampToArena = () => {
+    const limit = ARENA_HALF - 4
+    if (carGroup.position.x > limit) { carGroup.position.x = limit; speed *= 0.3 }
+    if (carGroup.position.x < -limit) { carGroup.position.x = -limit; speed *= 0.3 }
+    if (carGroup.position.z > limit) { carGroup.position.z = limit; speed *= 0.3 }
+    if (carGroup.position.z < -limit) { carGroup.position.z = -limit; speed *= 0.3 }
+  }
+
+  const trackTopSpeed = () => {
+    const mph = Math.round(Math.abs(speed) * 2.2)
+    if (mph > topSpeed) {
+      topSpeed = mph
+      hudTopSpeed.textContent = String(topSpeed)
+      // Post to leaderboard when top speed improves enough to matter.
+      if (userHasDriven && topSpeed - lastPostedTopSpeed >= TOP_SPEED_POST_THRESHOLD) {
+        lastPostedTopSpeed = topSpeed
+        void postTopSpeed(nameInput.value.trim() || 'racer', topSpeed)
+      }
+    }
   }
 
   const updateCamera = () => {
-    camTmp.copy(camOffset).applyQuaternion(carGroup.quaternion as unknown as THREE.Quaternion)
-    camTmp.add(carGroup.position as unknown as THREE.Vector3)
+    camTmp.copy(camOffset).applyQuaternion(carGroup.quaternion)
+    camTmp.add(carGroup.position)
     camera.position.lerp(camTmp, 0.18)
-    lookTmp.copy(carGroup.position as unknown as THREE.Vector3)
+    lookTmp.copy(carGroup.position)
     lookTmp.y += 0.8
     camera.lookAt(lookTmp.x, lookTmp.y, lookTmp.z)
   }
 
-  const ghostTmp = new THREE.Vector3()
   const interpolateGhosts = (now: number) => {
     const renderTime = now - INTERP_DELAY_MS
     for (const [, ghost] of ghosts) {
       if (ghost.buffer.length === 0) continue
       const yaw = sampleAt(ghost.buffer, renderTime, ghostTmp)
       if (yaw === null) continue
-      ;(ghost.mesh.position as unknown as { x: number; y: number; z: number }).x = ghostTmp.x
-      ;(ghost.mesh.position as unknown as { x: number; y: number; z: number }).y = ghostTmp.y
-      ;(ghost.mesh.position as unknown as { x: number; y: number; z: number }).z = ghostTmp.z
-      ;(ghost.mesh.rotation as unknown as { y: number }).y = yaw
+      ghost.mesh.position.x = ghostTmp.x
+      ghost.mesh.position.y = ghostTmp.y
+      ghost.mesh.position.z = ghostTmp.z
+      ghost.mesh.rotation.y = yaw
     }
   }
 
@@ -429,13 +398,28 @@ export function racePanel(): HTMLElement {
     seq++
     send({
       type: 'move',
-      x: (carGroup.position as unknown as { x: number }).x,
-      y: (carGroup.position as unknown as { y: number }).y,
-      z: (carGroup.position as unknown as { z: number }).z,
+      x: carGroup.position.x,
+      y: carGroup.position.y,
+      z: carGroup.position.z,
       ry: carGroup.rotation.y,
       seq,
       t: now,
     })
+  }
+
+  async function postTopSpeed(playerName: string, mph: number): Promise<void> {
+    try {
+      await fetch('/api/scores', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          name: `${playerName} (${mph} mph)`.slice(0, 24),
+          score: mph,
+        }),
+      })
+    } catch (err) {
+      logLine(log, `leaderboard post failed: ${(err as Error).message}`, 'fail')
+    }
   }
 
   // ── Wire up DOM ───────────────────────────────────────────────────────
@@ -453,18 +437,13 @@ export function racePanel(): HTMLElement {
       el('label', { class: 'field', children: [el('span', { text: 'name' }), nameInput] }),
       bigButton('Reset', () => {
         speed = 0
-        lap = 0
         userHasDriven = false
-        passedHalf = false
-        bestLapMs = null
-        hudBestLap.textContent = '—'
-        curve.getPointAt(0.001, carGroup.position as unknown as THREE.Vector3)
-        const t = new THREE.Vector3()
-        curve.getTangentAt(0.001, t)
-        carGroup.rotation.y = Math.atan2(t.x, t.z)
-        lapStartedAt = performance.now()
+        topSpeed = 0
+        lastPostedTopSpeed = 0
+        hudTopSpeed.textContent = '0'
+        carGroup.position.set(0, 0, 0)
+        carGroup.rotation.y = 0
         idleStartedAt = performance.now()
-        prevCarPos.copy(carGroup.position as unknown as THREE.Vector3)
       }),
       status,
     ],
@@ -478,16 +457,14 @@ export function racePanel(): HTMLElement {
         class: 'help race-help',
         html:
           '<strong>click the stage, then WASD or arrows.</strong> ' +
-          'Until you take over, the car cruises on its own. ' +
-          'Open a second tab to see a ghost of yourself driving — every visitor on this URL shares the room.',
+          'Until you take over, the car drives itself in a lazy figure-8. ' +
+          'Open a second tab and you appear as a ghost car — every visitor on this URL shares the arena.',
       }),
       controlsRow,
       log,
     ],
   })
 
-  // Boot. Auto-load car + connect lobby so the moment a visitor lands on
-  // the panel, there's a car cruising on the track and the lobby is alive.
   queueMicrotask(() => {
     resize()
     window.addEventListener('resize', resize)
@@ -497,7 +474,6 @@ export function racePanel(): HTMLElement {
     void loadCar()
   })
 
-  // Best-effort cleanup
   const observer = new MutationObserver(() => {
     if (!document.body.contains(body)) {
       cancelAnimationFrame(raf)
@@ -511,30 +487,11 @@ export function racePanel(): HTMLElement {
   })
   observer.observe(document.body, { childList: true, subtree: true })
 
-  void lastPing // keep referenced to avoid unused-var noise (we read it via hudPing)
-
-  async function postLap(playerName: string, lapMs: number): Promise<void> {
-    // Encode: score = floor(1_000_000 / lapMs). 60s lap = 16_666, 30s = 33_333,
-    // 15s = 66_666. Cap to a sane int to prevent overflow.
-    const lapSeconds = lapMs / 1000
-    const score = Math.min(1_000_000_000, Math.max(1, Math.floor(1_000_000 / lapMs)))
-    try {
-      await fetch('/api/scores', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          name: `${playerName} (${lapSeconds.toFixed(2)}s)`.slice(0, 24),
-          score,
-        }),
-      })
-    } catch (err) {
-      logLine(log, `leaderboard post failed: ${(err as Error).message}`, 'fail')
-    }
-  }
+  void lastPing
 
   return panel(
-    '2. Mini Race (multiplayer, ghost cars, lap timer)',
-    'The Ferrari from R2, on a procedurally-generated track, with WASD controls. Every visitor in the same room sees every other visitor as a ghost car, synced through a Durable Object at 20 Hz with snapshot interpolation. Lap times computed client-side with halfway-checkpoint anti-cheat.',
+    '2. Mini Arena (multiplayer, free roam)',
+    'The Ferrari from R2, on an open arena floor, with WASD controls. Every visitor in this URL shares the arena and sees the other visitors as ghost cars, synced through a Durable Object at 20 Hz with snapshot interpolation. Top speed achieved goes to the leaderboard.',
     body,
   )
 }
@@ -544,7 +501,7 @@ export function racePanel(): HTMLElement {
 // ───────────────────────────────────────────────────────────────────────────
 
 type Snapshot = { t: number; x: number; y: number; z: number; ry: number }
-type Ghost = { mesh: THREE.Object3D; buffer: Snapshot[]; lap: number }
+type Ghost = { mesh: THREE.Object3D; buffer: Snapshot[] }
 
 function hudCell(label: string, valueEl: HTMLElement, sub: string): HTMLElement {
   return el('div', {
@@ -557,148 +514,80 @@ function hudCell(label: string, valueEl: HTMLElement, sub: string): HTMLElement 
   })
 }
 
-function buildTrack(): {
-  mesh: THREE.Mesh
-  curve: THREE.CatmullRomCurve3
-  startLine: { a: THREE.Vector3; b: THREE.Vector3; forward: THREE.Vector3 }
-  halfway: { a: THREE.Vector3; b: THREE.Vector3 }
-} {
-  const TRACK_WIDTH = 12
-  const SEGMENTS = 256
-
-  // Closed loop in the XZ plane. Reasonable kart-track shape.
-  const points = [
-    new THREE.Vector3(60, 0, 0),
-    new THREE.Vector3(40, 0, 40),
-    new THREE.Vector3(0, 0, 55),
-    new THREE.Vector3(-40, 0, 45),
-    new THREE.Vector3(-60, 0, 10),
-    new THREE.Vector3(-50, 0, -30),
-    new THREE.Vector3(-10, 0, -55),
-    new THREE.Vector3(30, 0, -45),
-    new THREE.Vector3(55, 0, -20),
-  ]
-  const curve = new THREE.CatmullRomCurve3(points, true, 'catmullrom', 0.5)
-
-  const positions = new Float32Array((SEGMENTS + 1) * 2 * 3)
-  const uvs = new Float32Array((SEGMENTS + 1) * 2 * 2)
-  const up = new THREE.Vector3(0, 1, 0)
-  const tmpT = new THREE.Vector3()
-  const tmpN = new THREE.Vector3()
-  const tmpP = new THREE.Vector3()
-  const halfW = TRACK_WIDTH / 2
-
-  for (let i = 0; i <= SEGMENTS; i++) {
-    const t = i / SEGMENTS
-    curve.getPointAt(t, tmpP)
-    curve.getTangentAt(t, tmpT)
-    tmpN.crossVectors(tmpT, up).normalize().multiplyScalar(halfW)
-    const o = i * 6
-    positions[o + 0] = tmpP.x - tmpN.x
-    positions[o + 1] = 0
-    positions[o + 2] = tmpP.z - tmpN.z
-    positions[o + 3] = tmpP.x + tmpN.x
-    positions[o + 4] = 0
-    positions[o + 5] = tmpP.z + tmpN.z
-    const u = i * 4
-    uvs[u + 0] = 0
-    uvs[u + 1] = (t * SEGMENTS) / 4
-    uvs[u + 2] = 1
-    uvs[u + 3] = (t * SEGMENTS) / 4
-  }
-
-  const indices: number[] = []
-  for (let i = 0; i < SEGMENTS; i++) {
-    const a = i * 2
-    const b = i * 2 + 1
-    const c = i * 2 + 2
-    const d = i * 2 + 3
-    indices.push(a, b, d, a, d, c)
-  }
-
-  const geom = new THREE.BufferGeometry()
-  geom.setAttribute('position', new THREE.BufferAttribute(positions, 3))
-  geom.setAttribute('uv', new THREE.BufferAttribute(uvs, 2))
-  geom.setIndex(indices)
-  geom.computeVertexNormals()
-
-  // Asphalt + yellow centerline procedural texture.
+function buildArenaFloor(): THREE.Mesh {
+  // A large flat plane, white asphalt-ish, with a dark grid texture.
+  const size = ARENA_HALF * 2
+  const geom = new THREE.PlaneGeometry(size, size)
   const canvas = document.createElement('canvas')
-  canvas.width = 64
+  canvas.width = 512
   canvas.height = 512
   const g = canvas.getContext('2d')!
-  g.fillStyle = '#1c1c1c'
-  g.fillRect(0, 0, 64, 512)
-  g.fillStyle = '#ffe000'
-  for (let y = 0; y < 512; y += 64) g.fillRect(30, y, 4, 32)
-  // edge stripes
-  g.fillStyle = '#ffffff'
-  g.fillRect(2, 0, 2, 512)
-  g.fillRect(60, 0, 2, 512)
+  // Light asphalt base
+  g.fillStyle = '#cccccc'
+  g.fillRect(0, 0, 512, 512)
+  // Thin grid lines every 32 px
+  g.strokeStyle = '#444444'
+  g.lineWidth = 1
+  for (let i = 0; i <= 512; i += 32) {
+    g.beginPath()
+    g.moveTo(i, 0)
+    g.lineTo(i, 512)
+    g.moveTo(0, i)
+    g.lineTo(512, i)
+    g.stroke()
+  }
+  // Thicker major grid lines every 128 px
+  g.strokeStyle = '#1a1a1a'
+  g.lineWidth = 2
+  for (let i = 0; i <= 512; i += 128) {
+    g.beginPath()
+    g.moveTo(i, 0)
+    g.lineTo(i, 512)
+    g.moveTo(0, i)
+    g.lineTo(512, i)
+    g.stroke()
+  }
   const tex = new THREE.CanvasTexture(canvas)
   tex.wrapS = THREE.RepeatWrapping
   tex.wrapT = THREE.RepeatWrapping
-
+  // Tile the texture to make the grid dense across the whole floor.
+  ;(tex as unknown as { repeat: { set(x: number, y: number): void } }).repeat = { set(_x: number, _y: number) {} }
   const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.95, metalness: 0.0 })
   ;(mat as unknown as { map: unknown }).map = tex
   const mesh = new THREE.Mesh(geom, mat)
-
-  // Start line and halfway gate as line segments perpendicular to the tangent.
-  const startA = new THREE.Vector3()
-  const startB = new THREE.Vector3()
-  const startTan = new THREE.Vector3()
-  const startN = new THREE.Vector3()
-  curve.getPointAt(0, startA)
-  curve.getTangentAt(0, startTan)
-  startN.crossVectors(startTan, up).normalize().multiplyScalar(halfW)
-  const startCenter = startA.clone()
-  startA.copy(startCenter).sub(startN)
-  startB.copy(startCenter).add(startN)
-
-  const halfA = new THREE.Vector3()
-  const halfB = new THREE.Vector3()
-  const halfTan = new THREE.Vector3()
-  const halfN = new THREE.Vector3()
-  curve.getPointAt(0.5, halfA)
-  curve.getTangentAt(0.5, halfTan)
-  halfN.crossVectors(halfTan, up).normalize().multiplyScalar(halfW)
-  const halfCenter = halfA.clone()
-  halfA.copy(halfCenter).sub(halfN)
-  halfB.copy(halfCenter).add(halfN)
-
-  return {
-    mesh,
-    curve,
-    startLine: { a: startA, b: startB, forward: startTan.clone().normalize() },
-    halfway: { a: halfA, b: halfB },
-  }
-}
-
-function buildLineMarker(a: THREE.Vector3, b: THREE.Vector3, color: number): THREE.Mesh {
-  // A thin horizontal strip on the ground showing the start line.
-  const dx = b.x - a.x
-  const dz = b.z - a.z
-  const len = Math.hypot(dx, dz)
-  const cx = (a.x + b.x) / 2
-  const cz = (a.z + b.z) / 2
-  const angle = Math.atan2(dz, dx)
-  const geom = new THREE.PlaneGeometry(len, 1.4)
-  const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.5 })
-  const mesh = new THREE.Mesh(geom, mat)
-  ;(mesh.position as unknown as { x: number; y: number; z: number }).x = cx
-  ;(mesh.position as unknown as { x: number; y: number; z: number }).y = 0.02
-  ;(mesh.position as unknown as { x: number; y: number; z: number }).z = cz
   mesh.rotation.x = -Math.PI / 2
-  mesh.rotation.z = -angle
+  mesh.position.y = -0.01
   return mesh
 }
 
-function segmentsCrossXZ(p1: THREE.Vector3, p2: THREE.Vector3, a: THREE.Vector3, b: THREE.Vector3): boolean {
-  const d = (b.x - a.x) * (p2.z - p1.z) - (b.z - a.z) * (p2.x - p1.x)
-  if (Math.abs(d) < 1e-9) return false
-  const s = ((p2.z - p1.z) * (b.x - p1.x) - (p2.x - p1.x) * (b.z - p1.z)) / d
-  const t = ((b.z - a.z) * (b.x - p1.x) - (b.x - a.x) * (b.z - p1.z)) / d
-  return s >= 0 && s <= 1 && t >= 0 && t <= 1
+function buildOriginMarker(): THREE.Mesh {
+  // A small, low cylinder at the origin. The visual anchor of the arena
+  // without being in the way of drivers.
+  const geom = new THREE.PlaneGeometry(4, 4)
+  const canvas = document.createElement('canvas')
+  canvas.width = 128
+  canvas.height = 128
+  const g = canvas.getContext('2d')!
+  g.fillStyle = 'rgba(0,0,0,0)'
+  g.fillRect(0, 0, 128, 128)
+  g.strokeStyle = '#000'
+  g.lineWidth = 4
+  g.beginPath()
+  g.arc(64, 64, 50, 0, Math.PI * 2)
+  g.stroke()
+  g.fillStyle = '#000'
+  g.font = 'bold 72px Open Sans, sans-serif'
+  g.textAlign = 'center'
+  g.textBaseline = 'middle'
+  g.fillText('v', 64, 68)
+  const tex = new THREE.CanvasTexture(canvas)
+  const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.6, metalness: 0.0 })
+  ;(mat as unknown as { map: unknown; transparent: boolean }).map = tex
+  ;(mat as unknown as { transparent: boolean }).transparent = true
+  const mesh = new THREE.Mesh(geom, mat)
+  mesh.rotation.x = -Math.PI / 2
+  mesh.position.y = 0.02
+  return mesh
 }
 
 function sampleAt(buf: Snapshot[], renderTime: number, out: THREE.Vector3): number | null {
