@@ -4,30 +4,62 @@
 
 [![Live demo](https://img.shields.io/badge/demo-vibe--cdn.coey.dev-000000?style=for-the-badge)](https://vibe-cdn.coey.dev)
 [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/acoyfellow/vibe-cdn)
+[![Open in StackBlitz](https://img.shields.io/badge/open%20in-StackBlitz-1389FD?style=for-the-badge&logo=stackblitz)](https://stackblitz.com/github/acoyfellow/vibe-cdn)
 [![MIT](https://img.shields.io/badge/license-MIT-blue?style=for-the-badge)](LICENSE)
 
-![Drag a .glb onto the page and get back a public, edge-cached URL.](docs/screenshots/hero.png)
+![Drop a .glb on the page and get back a public, edge-cached URL.](docs/screenshots/hero.png)
 
-Drag any `.glb` onto the page. Get back a public, edge-cached URL on Cloudflare's edge in a single round trip.
+Drag any `.glb` onto the page. Get back a public, edge-cached URL on Cloudflare's edge in one round trip.
 
 ![Upload success: short URL, copy button, sha, expiry, paste-ready Three.js snippet.](docs/screenshots/uploaded.png)
 
+Drive a Ferrari around an open arena. Every visitor on the same URL appears as a ghost car, synced through a Durable Object at 20 Hz.
+
+![Ferrari on the arena, HUD shows top speed and live player count.](docs/screenshots/race.png)
+
 ## Quick start
 
+Three options.
+
 ```bash
+# 1. clone and run locally (best for hacking)
 git clone https://github.com/acoyfellow/vibe-cdn
 cd vibe-cdn
 bun install
 bun run demo
 ```
 
-Open the URL it prints. The page is the product:
+```bash
+# 2. scaffold a fresh copy under your own repo name (best for shipping your own)
+npx tiged acoyfellow/vibe-cdn my-game-cdn
+cd my-game-cdn
+bun install
+bun run demo
+```
+
+[Open in StackBlitz](https://stackblitz.com/github/acoyfellow/vibe-cdn) — the local demo runs in your browser, no install required.
+
+Then open the URL it prints. The page is the product:
 
 - a **live stats ticker** counting real assets, requests, scores, saves
 - a **drop zone** that accepts your model and gives back an edge-cached URL
+- an **open multiplayer arena** — drive a Ferrari, see other visitors as ghost cars
 - seven **receipts panels** below — every primitive on the stack, wired, probed, and clickable
 
 No Cloudflare account required for the local run.
+
+## Embed the arena in your own page
+
+```html
+<iframe
+  src="https://vibe-cdn.coey.dev/embed/arena"
+  style="width: 100%; aspect-ratio: 16/9; border: 0;"
+  allow="autoplay"
+  loading="lazy"
+></iframe>
+```
+
+Visitors to your page join the same Durable Object room as visitors to vibe-cdn.coey.dev. It's one shared arena.
 
 ## What's in the box
 
@@ -40,27 +72,8 @@ No Cloudflare account required for the local run.
 | **D1**             | Leaderboards + game saves                 | `/api/scores`, `/api/saves/...`   |
 | **KV**             | Per-IP rate limits, edge caches           | (bound, used internally)          |
 | **Live stats**     | Aggregated counts from the bindings       | `/api/stats`                      |
-| **Cost model**     | Pure math, paid sliders to play with      | `/api/cost/estimate`              |
-
-## What changes first
-
-Drop your own `.glb` in the page hero. You'll get a URL like `https://vibe-cdn.coey.dev/u/k7x2pq.glb` and a paste-ready Three.js snippet.
-
-For permanent assets (no 24-hour expiry):
-
-```bash
-# put a glb into the permanent R2 bucket
-wrangler r2 object put vibe-cdn-assets/demo/your-model.glb --file ./your-model.glb \
-  --content-type model/gltf-binary \
-  --cache-control 'public, max-age=31536000, immutable'
-```
-
-Or optimize first:
-
-```bash
-bun run optimize ./your-model.glb       # dedup + prune + texture compress
-# → ~30% size reduction without optional Draco/Meshopt/KTX2 encoders
-```
+| **Cost model**     | Pure math, sliders to play with           | `/api/cost/estimate`              |
+| **Embed view**     | Just the arena, no chrome, iframe-ready   | `/embed/arena`                    |
 
 ## How the asset path works
 
@@ -128,7 +141,7 @@ Or click the [Deploy to Cloudflare](https://deploy.workers.cloudflare.com/?url=h
 - [`docs/architecture.md`](docs/architecture.md) — every route, every primitive, every diagram
 - [`docs/costs.md`](docs/costs.md) — 1k / 50k / 5M player cost scenarios with line items
 - [`docs/deploy.md`](docs/deploy.md) — production deploy guide
-- [`docs/screenshots/`](docs/screenshots/) — drop zone, hero, snippet panel
+- [`docs/screenshots/`](docs/screenshots/) — drop zone, arena, hero
 
 ## Why this exists
 

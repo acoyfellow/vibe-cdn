@@ -1,0 +1,82 @@
+/* Embed-mode overrides — make the arena fill the whole iframe surface. */
+
+html, body, #app.embed-mode {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  background: var(--canvas);
+}
+
+#app.embed-mode {
+  display: block;
+  max-width: none;
+  padding: 0;
+}
+
+#app.embed-mode .panel {
+  border: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+#app.embed-mode .panel-head {
+  display: none;
+}
+
+#app.embed-mode .panel-body {
+  gap: 0;
+}
+
+#app.embed-mode .race-stage {
+  border-radius: 0;
+  aspect-ratio: auto;
+  height: 100vh;
+  width: 100vw;
+}
+
+#app.embed-mode .race-help,
+#app.embed-mode .row,
+#app.embed-mode .log {
+  display: none;
+}
+
+.embed-wrapper {
+  position: relative;
+}
+
+.embed-attr {
+  position: fixed;
+  bottom: 14px;
+  right: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: var(--canvas);
+  color: var(--ink);
+  border: 1px solid var(--ink);
+  border-radius: 999px;
+  font-family: var(--font-primary);
+  font-weight: 600;
+  font-size: 12px;
+  text-decoration: none;
+  z-index: 100;
+}
+
+.embed-attr-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  background: var(--ink);
+  color: var(--canvas);
+  border-radius: 4px;
+  font-weight: 800;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.embed-attr:hover {
+  opacity: 0.85;
+}

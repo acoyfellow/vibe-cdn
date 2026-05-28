@@ -58,18 +58,26 @@ export function racePanel(): HTMLElement {
     attrs: { type: 'text', maxlength: '24', value: 'kiddo' },
   })
 
-  // ── Three.js scene ────────────────────────────────────────────────────
+  // ── Three.js scene ───────────────────────────────────────────────
   const scene = new THREE.Scene()
-  scene.background = new THREE.Color(0x000000)
+  // Soft off-black so the floor fades into a horizon rather than
+  // hard-edging on a pure black void.
+  const HORIZON_COLOR = 0x0a0b10
+  scene.background = new THREE.Color(HORIZON_COLOR)
+  // Fog falls off at the edge of the arena so the gridded floor visually
+  // dissolves into the horizon.
+  scene.fog = new THREE.Fog(HORIZON_COLOR, ARENA_HALF * 0.55, ARENA_HALF * 1.4)
 
   const camera = new THREE.PerspectiveCamera(60, 16 / 9, 0.1, 800)
 
   const renderer = new THREE.WebGLRenderer({ antialias: true })
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
-  renderer.setClearColor(0x000000, 1)
+  renderer.setClearColor(HORIZON_COLOR, 1)
   stage.appendChild(renderer.domElement)
 
-  scene.add(new THREE.AmbientLight(0xffffff, 0.4))
+  // Sky/ground hemisphere gives the floor an even ambient.
+  scene.add(new THREE.HemisphereLight(0xc8d8ff, 0x1a1a1a, 0.7) as unknown as object)
+  scene.add(new THREE.AmbientLight(0xffffff, 0.25))
   const sun = new THREE.DirectionalLight(0xffffff, 1.5)
   sun.position.set(60, 100, 40)
   scene.add(sun as unknown as object)
@@ -135,7 +143,10 @@ export function racePanel(): HTMLElement {
         root.position.set(0, 0, 0)
 
         carTemplate = root
+        // The Ferrari model faces -Z; our carForward is +Z. Spin the
+         // visible model 180° so it points the way it's driving.
         const playerCar = (root as unknown as { clone: (deep?: boolean) => THREE.Object3D }).clone(true)
+        playerCar.rotation.y = Math.PI
         carGroup.add(playerCar)
 
         // Snap the camera so the first frame is a flattering chase shot.
@@ -247,8 +258,13 @@ export function racePanel(): HTMLElement {
       if (!ghost) {
         if (!carTemplate) continue
         const mesh = (carTemplate as unknown as { clone: (deep?: boolean) => THREE.Object3D }).clone(true)
-        scene.add(mesh)
-        ghost = { mesh, buffer: [] }
+        // Ghost cars: wrap in a Group so the inner mesh keeps the same
+         // 180° model-face fix while we drive the group's yaw from the wire.
+        const ghostGroup = new THREE.Group()
+        mesh.rotation.y = Math.PI
+        ghostGroup.add(mesh)
+        scene.add(ghostGroup)
+        ghost = { mesh: ghostGroup, buffer: [] }
         ghosts.set(p.id, ghost)
       }
       ghost.buffer.push({ t: tNow, x: p.x, y: p.y, z: p.z, ry: p.ry })

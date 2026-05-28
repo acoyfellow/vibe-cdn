@@ -48,6 +48,7 @@ declare module 'three' {
 
   export class Scene extends Object3D {
     background: unknown
+    fog: unknown
   }
 
   export class PerspectiveCamera extends Object3D {
@@ -75,8 +76,16 @@ declare module 'three' {
     constructor(color?: number, intensity?: number)
   }
 
+  export class HemisphereLight extends Object3D {
+    constructor(skyColor?: number, groundColor?: number, intensity?: number)
+  }
+
   export class DirectionalLight extends Object3D {
     constructor(color?: number, intensity?: number)
+  }
+
+  export class Fog {
+    constructor(color: number, near: number, far: number)
   }
 
   export class GridHelper extends Object3D {

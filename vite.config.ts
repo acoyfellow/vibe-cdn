@@ -1,4 +1,5 @@
 import { defineConfig } from 'vite'
+import { resolve } from 'node:path'
 
 export default defineConfig({
   root: 'app',
@@ -6,6 +7,12 @@ export default defineConfig({
     outDir: 'dist',
     emptyOutDir: true,
     sourcemap: true,
+    rollupOptions: {
+      input: {
+        main: resolve(__dirname, 'app/index.html'),
+        embed: resolve(__dirname, 'app/embed.html'),
+      },
+    },
   },
   server: {
     host: '127.0.0.1',
