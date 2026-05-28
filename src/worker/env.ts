@@ -1,5 +1,6 @@
 export type Env = {
   ASSETS: R2Bucket
+  UPLOADS: R2Bucket
   DB: D1Database
   SAVES: KVNamespace
   LOBBY: DurableObjectNamespace

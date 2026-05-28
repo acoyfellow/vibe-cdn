@@ -136,7 +136,7 @@ async function loadExisting(): Promise<GeneratedFixture[]> {
 }
 
 function parseArgs(argv: string[]): SeedOptions {
-  let workerUrl = process.env.WORKER_URL ?? 'http://127.0.0.1:8789'
+  let workerUrl = process.env.WORKER_URL ?? 'http://127.0.0.1:9787'
   let skipGenerate = false
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]

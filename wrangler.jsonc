@@ -17,6 +17,10 @@
     {
       "binding": "ASSETS",
       "bucket_name": "vibe-cdn-assets"
+    },
+    {
+      "binding": "UPLOADS",
+      "bucket_name": "vibe-cdn-uploads"
     }
   ],
   "kv_namespaces": [
@@ -62,7 +66,8 @@
         { "pattern": "vibe-cdn.coey.dev", "custom_domain": true }
       ],
       "r2_buckets": [
-        { "binding": "ASSETS", "bucket_name": "vibe-cdn-assets" }
+        { "binding": "ASSETS", "bucket_name": "vibe-cdn-assets" },
+        { "binding": "UPLOADS", "bucket_name": "vibe-cdn-uploads" }
       ],
       "kv_namespaces": [
         { "binding": "SAVES", "id": "56167bf76c4446d8ac96248404ff4ae6" }

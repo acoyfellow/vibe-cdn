@@ -6,6 +6,8 @@ import { json, notFound } from './http'
 import { handleAssets, handleDevUpload, handleManifest } from './routes/assets'
 import { handleSave } from './routes/saves'
 import { handleScores } from './routes/scores'
+import { handleStats } from './routes/stats'
+import { handlePublicGet, handleUpload } from './routes/uploads'
 
 export { LobbyDO }
 
@@ -33,10 +35,20 @@ export default {
       return handleDevUpload(request, env, decodeURIComponent(url.pathname.slice('/__dev/upload/'.length)))
     }
 
+    if (url.pathname === '/api/u' || url.pathname === '/api/u/') {
+      return handleUpload(request, env)
+    }
+
+    if (url.pathname.startsWith('/u/')) {
+      return handlePublicGet(request, env, decodeURIComponent(url.pathname.slice('/u/'.length)))
+    }
+
     if (url.pathname === '/api/scores') return handleScores(request, env)
 
     const saveMatch = /^\/api\/saves\/([^/]+)\/([^/]+)$/.exec(url.pathname)
     if (saveMatch) return handleSave(request, env, decodeURIComponent(saveMatch[1]), decodeURIComponent(saveMatch[2]))
+
+    if (url.pathname === '/api/stats') return handleStats(request, env)
 
     if (url.pathname === '/api/cost/estimate') {
       const input = {

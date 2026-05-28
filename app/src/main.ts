@@ -1,9 +1,9 @@
-// vibe-cdn local demo entry. Composes seven big panels with kid-friendly
-// statuses. Each panel is self-contained and uses the worker on /health,
-// /assets, /api, /ws.
+// vibe-cdn entry. The hero is the product (drop zone + live stats), the
+// panels below are the receipts.
 
 import './style.css'
 import { el } from './dom'
+import { buildHero } from './hero'
 import { healthPanel } from './panels/health'
 import { gltfPanel } from './panels/gltf'
 import { rangePanel } from './panels/range'
@@ -15,25 +15,16 @@ import { costPanel } from './panels/cost'
 const root = document.getElementById('app')
 if (!root) throw new Error('#app missing')
 
-const header = el('header', {
-  class: 'app-head',
+const hero = buildHero()
+
+const receiptsLead = el('section', {
+  class: 'receipts-lead',
   children: [
-    el('div', {
-      class: 'app-head-row',
-      children: [
-        el('h1', { text: 'vibe-cdn' }),
-        el('span', { class: 'tag', text: '0.0.1' }),
-      ],
-    }),
+    el('h2', { class: 'receipts-h', text: 'the receipts' }),
     el('p', {
-      class: 'app-sub',
-      text: 'A Cloudflare game stack for heavy browser games. R2 assets, Worker CDN, Durable Object rooms, D1 scores, KV saves.',
-    }),
-    el('p', {
-      class: 'first-edit',
-      html:
-        'First edit: drop a <code>.glb</code> in <code>fixtures/generated/demo/</code> as <code>triangle.glb</code>, then ' +
-        '<code>bun run seed</code>. The model loader panel will show your model.',
+      class: 'receipts-sub',
+      text:
+        'Every primitive on the stack, wired up and probed. Click around. Open a second tab for the lobby.',
     }),
   ],
 })
@@ -79,6 +70,7 @@ const footer = el('footer', {
   ],
 })
 
-root.appendChild(header)
+root.appendChild(hero)
+root.appendChild(receiptsLead)
 root.appendChild(stack)
 root.appendChild(footer)

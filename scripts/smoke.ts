@@ -259,7 +259,7 @@ function pickAssetKey(manifest: AssetManifest | null): string | null {
 }
 
 function parseArgs(argv: string[]): { workerUrl: string } {
-  let workerUrl = process.env.WORKER_URL ?? 'http://127.0.0.1:8789'
+  let workerUrl = process.env.WORKER_URL ?? 'http://127.0.0.1:9787'
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]
     if (arg === '--worker' || arg === '--worker-url') {
