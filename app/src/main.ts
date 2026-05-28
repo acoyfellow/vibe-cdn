@@ -6,6 +6,7 @@ import { el } from './dom'
 import { buildHero } from './hero'
 import { healthPanel } from './panels/health'
 import { gltfPanel } from './panels/gltf'
+import { racePanel } from './panels/race'
 import { rangePanel } from './panels/range'
 import { lobbyPanel } from './panels/lobby'
 import { leaderboardPanel } from './panels/leaderboard'
@@ -33,6 +34,7 @@ const stack = el('main', {
   class: 'panels',
   children: [
     healthPanel(),
+    racePanel(),
     gltfPanel(),
     rangePanel(),
     lobbyPanel(),
