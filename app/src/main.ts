@@ -44,6 +44,41 @@ const stack = el('main', {
   ],
 })
 
+const closer = el('section', {
+  class: 'closer',
+  children: [
+    el('h2', { class: 'closer-h', text: 'wanna make a game on Cloudflare?' }),
+    el('p', {
+      class: 'closer-sub',
+      text:
+        'Everything you just clicked through is in one repo. Click deploy and you get the same stack on your own Cloudflare account in 90 seconds. R2 bucket, Worker, Durable Object, D1, KV, custom domain ready to wire. MIT.',
+    }),
+    el('div', {
+      class: 'closer-cta',
+      children: [
+        el('a', {
+          class: 'cta-deploy closer-deploy',
+          attrs: {
+            href: 'https://deploy.workers.cloudflare.com/?url=https://github.com/acoyfellow/vibe-cdn',
+            target: '_blank',
+            rel: 'noreferrer',
+          },
+          text: 'deploy this stack →',
+        }),
+        el('a', {
+          class: 'closer-secondary',
+          attrs: {
+            href: 'https://github.com/acoyfellow/vibe-cdn',
+            target: '_blank',
+            rel: 'noreferrer',
+          },
+          text: 'read the source',
+        }),
+      ],
+    }),
+  ],
+})
+
 const footer = el('footer', {
   class: 'app-foot',
   children: [
@@ -75,4 +110,5 @@ const footer = el('footer', {
 root.appendChild(hero)
 root.appendChild(receiptsLead)
 root.appendChild(stack)
+root.appendChild(closer)
 root.appendChild(footer)

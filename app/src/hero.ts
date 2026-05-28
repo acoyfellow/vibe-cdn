@@ -303,7 +303,21 @@ function wireDropZone(
               copyButton(snippet, 'copy snippet'),
             ],
           }),
-          el('button', { class: 'reset-btn', text: 'upload another', on: { click: reset } }),
+          el('div', {
+            class: 'cta-row',
+            children: [
+              el('button', { class: 'reset-btn', text: 'upload another', on: { click: reset } }),
+              el('a', {
+                class: 'cta-deploy',
+                attrs: {
+                  href: 'https://deploy.workers.cloudflare.com/?url=https://github.com/acoyfellow/vibe-cdn',
+                  target: '_blank',
+                  rel: 'noreferrer',
+                },
+                text: 'deploy this for your game →',
+              }),
+            ],
+          }),
         ],
       }),
     )

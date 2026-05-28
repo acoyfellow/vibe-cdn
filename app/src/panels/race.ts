@@ -33,7 +33,7 @@ const TURN_RATE = 1.8
 const DRAG = 0.8
 
 export function racePanel(): HTMLElement {
-  const status = makeStatus('idle', 'load car to start')
+  const status = makeStatus('busy', 'connecting…')
   const log = el('div', { class: 'log' })
   const stage = el('div', { class: 'gltf-stage race-stage' })
 
@@ -114,6 +114,8 @@ export function racePanel(): HTMLElement {
   let pingTimer: number | null = null
   let raf = 0
   let lastFrameAt = performance.now()
+  let userHasDriven = false
+  let idleStartedAt = performance.now()
   const prevCarPos = new THREE.Vector3()
   const motionVec = new THREE.Vector3()
   const carForward = new THREE.Vector3()
@@ -149,9 +151,19 @@ export function racePanel(): HTMLElement {
         ;(carGroup as unknown as { add(child: unknown): void }).add(playerCar)
         prevCarPos.copy(carGroup.position as unknown as THREE.Vector3)
 
+        // Snap the camera to a flattering pre-position so the first frame
+        // shows the car on the track, not the inside of the origin.
+        camTmp.copy(camOffset).applyQuaternion(carGroup.quaternion)
+        camTmp.add(carGroup.position)
+        camera.position.copy(camTmp)
+        lookTmp.copy(carGroup.position)
+        lookTmp.y += 0.8
+        camera.lookAt(lookTmp.x, lookTmp.y, lookTmp.z)
+
         const ms = Math.round(performance.now() - t0)
         logLine(log, `loaded ${CAR_ASSET} in ${ms} ms`, 'ok')
         setStatus(status, 'ok', `ready — WASD to drive`)
+        idleStartedAt = performance.now()
         connect()
       },
       undefined,
@@ -300,6 +312,15 @@ export function racePanel(): HTMLElement {
   }
 
   const updateCar = (dt: number) => {
+    // Ambient idle: until the user presses anything, the car cruises forward
+    // at a gentle speed along the track curve. This means the page is alive
+    // the moment a visitor lands.
+    const anyKey = keys.w || keys.a || keys.s || keys.d
+    if (anyKey && !userHasDriven) userHasDriven = true
+    if (!userHasDriven) {
+      idleCruise(dt)
+      return
+    }
     if (keys.w) speed += ACCEL * dt
     if (keys.s) speed -= REVERSE_ACCEL * dt
     // Drag — strong when no input, light when accelerating.
@@ -343,9 +364,39 @@ export function racePanel(): HTMLElement {
         }
         send({ type: 'lap', lap, lastLapMs: lapMs })
         logLine(log, `lap ${lap} — ${(lapMs / 1000).toFixed(2)}s`, 'ok')
+        // Post the lap to the global leaderboard. Score is encoded so faster
+        // laps rank higher (existing /api/scores sorts DESC by score). The
+        // leaderboard panel decodes the time for display.
+        void postLap(nameInput.value.trim() || 'racer', lapMs)
       }
     }
     prevCarPos.copy(carGroup.position as unknown as THREE.Vector3)
+  }
+
+  const idleCruise = (dt: number) => {
+    // Sample a point ~12 units ahead of where we are on the curve, then
+    // steer toward it. Speed glides to a comfortable cruise.
+    const seconds = (performance.now() - idleStartedAt) / 1000
+    const t = (seconds * 0.005) % 1 // 200s lap in idle
+    const aheadT = (t + 0.002) % 1
+    const target = new THREE.Vector3()
+    curve.getPointAt(aheadT, target)
+    const targetYaw = Math.atan2(
+      target.x - carGroup.position.x,
+      target.z - carGroup.position.z,
+    )
+    // shortest-arc lerp toward target yaw
+    let dy = targetYaw - carGroup.rotation.y
+    if (dy > Math.PI) dy -= Math.PI * 2
+    if (dy < -Math.PI) dy += Math.PI * 2
+    carGroup.rotation.y += dy * Math.min(1, dt * 2.5)
+    // ramp speed up gently to ~8 m/s
+    speed += (8 - speed) * Math.min(1, dt * 0.6)
+    carForward.set(Math.sin(carGroup.rotation.y), 0, Math.cos(carGroup.rotation.y))
+    carGroup.position.x += carForward.x * speed * dt
+    carGroup.position.z += carForward.z * speed * dt
+    hudSpeed.textContent = String(Math.round(Math.abs(speed) * 2.2))
+    hudLap.textContent = String(lap)
   }
 
   const updateCamera = () => {
@@ -400,10 +451,10 @@ export function racePanel(): HTMLElement {
     class: 'row',
     children: [
       el('label', { class: 'field', children: [el('span', { text: 'name' }), nameInput] }),
-      bigButton('Load + Race', loadCar),
       bigButton('Reset', () => {
         speed = 0
         lap = 0
+        userHasDriven = false
         passedHalf = false
         bestLapMs = null
         hudBestLap.textContent = '—'
@@ -412,6 +463,7 @@ export function racePanel(): HTMLElement {
         curve.getTangentAt(0.001, t)
         carGroup.rotation.y = Math.atan2(t.x, t.z)
         lapStartedAt = performance.now()
+        idleStartedAt = performance.now()
         prevCarPos.copy(carGroup.position as unknown as THREE.Vector3)
       }),
       status,
@@ -421,23 +473,28 @@ export function racePanel(): HTMLElement {
   const body = el('div', {
     class: 'panel-body',
     children: [
-      controlsRow,
       stage,
       el('p', {
-        class: 'help',
-        text: 'click the stage to focus, then WASD or arrows. Open a second tab to see a ghost of yourself.',
+        class: 'help race-help',
+        html:
+          '<strong>click the stage, then WASD or arrows.</strong> ' +
+          'Until you take over, the car cruises on its own. ' +
+          'Open a second tab to see a ghost of yourself driving — every visitor on this URL shares the room.',
       }),
+      controlsRow,
       log,
     ],
   })
 
-  // Boot
+  // Boot. Auto-load car + connect lobby so the moment a visitor lands on
+  // the panel, there's a car cruising on the track and the lobby is alive.
   queueMicrotask(() => {
     resize()
     window.addEventListener('resize', resize)
     stage.setAttribute('tabindex', '0')
     stage.addEventListener('click', () => stage.focus())
     raf = requestAnimationFrame(tick)
+    void loadCar()
   })
 
   // Best-effort cleanup
@@ -455,6 +512,25 @@ export function racePanel(): HTMLElement {
   observer.observe(document.body, { childList: true, subtree: true })
 
   void lastPing // keep referenced to avoid unused-var noise (we read it via hudPing)
+
+  async function postLap(playerName: string, lapMs: number): Promise<void> {
+    // Encode: score = floor(1_000_000 / lapMs). 60s lap = 16_666, 30s = 33_333,
+    // 15s = 66_666. Cap to a sane int to prevent overflow.
+    const lapSeconds = lapMs / 1000
+    const score = Math.min(1_000_000_000, Math.max(1, Math.floor(1_000_000 / lapMs)))
+    try {
+      await fetch('/api/scores', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          name: `${playerName} (${lapSeconds.toFixed(2)}s)`.slice(0, 24),
+          score,
+        }),
+      })
+    } catch (err) {
+      logLine(log, `leaderboard post failed: ${(err as Error).message}`, 'fail')
+    }
+  }
 
   return panel(
     '2. Mini Race (multiplayer, ghost cars, lap timer)',

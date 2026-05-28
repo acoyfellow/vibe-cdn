@@ -80,5 +80,9 @@ export function leaderboardPanel(): HTMLElement {
 
   queueMicrotask(refresh)
 
-  return panel('5. Leaderboard (D1)', 'POST a score to /api/scores, then read the top 25 back.', body)
+  return panel(
+    '5. Leaderboard (D1)',
+    'Lap times from the Mini Race above land here automatically, scored so faster laps rank higher. POST your own to /api/scores to join the leaderboard.',
+    body,
+  )
 }
