@@ -5,7 +5,7 @@
 import { fetchRange } from '../api'
 import { bigButton, el, logLine, makeStatus, panel, setStatus } from '../dom'
 
-const ASSET_PATH = '/assets/demo/large.bin'
+const ASSET_PATH = '/cdn/demo/large.bin'
 const DEFAULT_CHUNK = 1024 * 1024 // 1 MiB
 const DEFAULT_PARALLEL = 4
 

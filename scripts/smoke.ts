@@ -3,12 +3,12 @@
  * End-to-end smoke test for the local Worker. Hits every public surface:
  *  - GET /health
  *  - GET /manifest.json
- *  - HEAD /assets/:key
- *  - GET /assets/:key (full body)
- *  - GET /assets/:key with valid Range
- *  - GET /assets/:key with invalid Range (start>end)
- *  - GET /assets/:key with If-None-Match (expect 304)
- *  - OPTIONS /assets/:key (CORS preflight)
+ *  - HEAD /cdn/:key
+ *  - GET /cdn/:key (full body)
+ *  - GET /cdn/:key with valid Range
+ *  - GET /cdn/:key with invalid Range (start>end)
+ *  - GET /cdn/:key with If-None-Match (expect 304)
+ *  - OPTIONS /cdn/:key (CORS preflight)
  *  - GET/POST /api/scores
  *  - PUT/GET /api/saves/:player/:slot
  *  - WebSocket /ws/lobby/:id  (join, ping/pong, snapshot)
@@ -96,58 +96,58 @@ class Smoke {
   }
 
   private async assetHead(key: string): Promise<void> {
-    const response = await fetch(`${this.workerUrl}/assets/${encodeURI(key)}`, { method: 'HEAD' })
+    const response = await fetch(`${this.workerUrl}/cdn/${encodeURI(key)}`, { method: 'HEAD' })
     const length = Number(response.headers.get('content-length') ?? '0')
-    this.assert(`HEAD /assets/${key}`, response.status === 200 && length > 0, `status=${response.status} length=${length}`)
-    this.assert(`HEAD /assets/${key} accept-ranges`, response.headers.get('accept-ranges') === 'bytes', response.headers.get('accept-ranges') ?? 'missing')
+    this.assert(`HEAD /cdn/${key}`, response.status === 200 && length > 0, `status=${response.status} length=${length}`)
+    this.assert(`HEAD /cdn/${key} accept-ranges`, response.headers.get('accept-ranges') === 'bytes', response.headers.get('accept-ranges') ?? 'missing')
   }
 
   private async assetGet(key: string): Promise<string | null> {
-    const response = await fetch(`${this.workerUrl}/assets/${encodeURI(key)}`)
+    const response = await fetch(`${this.workerUrl}/cdn/${encodeURI(key)}`)
     const ok = response.status === 200
     const etag = response.headers.get('etag')
     const cacheControl = response.headers.get('cache-control') ?? ''
     if (ok) {
       const buf = await response.arrayBuffer()
-      this.assert(`GET /assets/${key}`, buf.byteLength > 0, `bytes=${buf.byteLength}`)
+      this.assert(`GET /cdn/${key}`, buf.byteLength > 0, `bytes=${buf.byteLength}`)
     } else {
-      this.assert(`GET /assets/${key}`, false, `status=${response.status}`)
+      this.assert(`GET /cdn/${key}`, false, `status=${response.status}`)
     }
-    this.assert(`GET /assets/${key} cache-control immutable`, cacheControl.includes('immutable'), cacheControl)
-    this.assert(`GET /assets/${key} etag present`, !!etag, etag ?? 'missing')
+    this.assert(`GET /cdn/${key} cache-control immutable`, cacheControl.includes('immutable'), cacheControl)
+    this.assert(`GET /cdn/${key} etag present`, !!etag, etag ?? 'missing')
     return etag
   }
 
   private async assetRange(key: string): Promise<void> {
-    const response = await fetch(`${this.workerUrl}/assets/${encodeURI(key)}`, { headers: { range: 'bytes=0-15' } })
+    const response = await fetch(`${this.workerUrl}/cdn/${encodeURI(key)}`, { headers: { range: 'bytes=0-15' } })
     const buf = await response.arrayBuffer()
     const contentRange = response.headers.get('content-range') ?? ''
     this.assert(
-      `GET /assets/${key} range`,
+      `GET /cdn/${key} range`,
       response.status === 206 && buf.byteLength === 16 && /^bytes 0-15\/\d+$/.test(contentRange),
       `status=${response.status} bytes=${buf.byteLength} content-range=${contentRange}`,
     )
   }
 
   private async assetInvalidRange(key: string): Promise<void> {
-    const response = await fetch(`${this.workerUrl}/assets/${encodeURI(key)}`, { headers: { range: 'bytes=20-5' } })
+    const response = await fetch(`${this.workerUrl}/cdn/${encodeURI(key)}`, { headers: { range: 'bytes=20-5' } })
     // Worker policy: invalid (start>end) returns a 206 with zero-length payload.
     // Either a 4xx range-not-satisfiable OR a 206 with content-length=0 is acceptable.
     const length = Number(response.headers.get('content-length') ?? '0')
     const acceptable = response.status === 416 || (response.status === 206 && length === 0) || response.status === 200
-    this.assert(`GET /assets/${key} invalid range`, acceptable, `status=${response.status} length=${length}`)
+    this.assert(`GET /cdn/${key} invalid range`, acceptable, `status=${response.status} length=${length}`)
     // Drain body so we don't leak the stream.
     await response.arrayBuffer().catch(() => undefined)
   }
 
   private async assetIfNoneMatch(key: string, etag: string): Promise<void> {
-    const response = await fetch(`${this.workerUrl}/assets/${encodeURI(key)}`, { headers: { 'if-none-match': etag } })
-    this.assert(`GET /assets/${key} if-none-match`, response.status === 304, `status=${response.status}`)
+    const response = await fetch(`${this.workerUrl}/cdn/${encodeURI(key)}`, { headers: { 'if-none-match': etag } })
+    this.assert(`GET /cdn/${key} if-none-match`, response.status === 304, `status=${response.status}`)
     await response.arrayBuffer().catch(() => undefined)
   }
 
   private async assetCors(key: string): Promise<void> {
-    const response = await fetch(`${this.workerUrl}/assets/${encodeURI(key)}`, {
+    const response = await fetch(`${this.workerUrl}/cdn/${encodeURI(key)}`, {
       method: 'OPTIONS',
       headers: {
         origin: 'http://127.0.0.1:5173',
@@ -156,7 +156,7 @@ class Smoke {
       },
     })
     const allowOrigin = response.headers.get('access-control-allow-origin') ?? ''
-    this.assert(`OPTIONS /assets/${key} cors`, response.status === 204 && allowOrigin === '*', `status=${response.status} origin=${allowOrigin}`)
+    this.assert(`OPTIONS /cdn/${key} cors`, response.status === 204 && allowOrigin === '*', `status=${response.status} origin=${allowOrigin}`)
   }
 
   private async scores(): Promise<void> {

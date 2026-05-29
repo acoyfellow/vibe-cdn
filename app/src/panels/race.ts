@@ -19,7 +19,7 @@ import type {
 } from '../../../src/shared/contracts'
 import { bigButton, el, logLine, makeStatus, panel, setStatus } from '../dom'
 
-const CAR_ASSET = '/assets/demo/car.glb'
+const CAR_ASSET = '/cdn/demo/car.glb'
 const LOBBY_PATH = '/ws/lobby/arena'
 const SEND_HZ = 20
 const SEND_MS = 1000 / SEND_HZ

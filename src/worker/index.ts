@@ -27,8 +27,8 @@ export default {
 
     if (url.pathname === '/manifest.json') return handleManifest(request, env)
 
-    if (url.pathname.startsWith('/assets/')) {
-      return handleAssets(request, env, decodeURIComponent(url.pathname.slice('/assets/'.length)))
+    if (url.pathname.startsWith('/cdn/')) {
+      return handleAssets(request, env, decodeURIComponent(url.pathname.slice('/cdn/'.length)))
     }
 
     if (url.pathname.startsWith('/__dev/upload/')) {

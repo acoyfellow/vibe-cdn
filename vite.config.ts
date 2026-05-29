@@ -22,7 +22,8 @@ export default defineConfig({
     port: 5374,
     proxy: {
       '/api': 'http://127.0.0.1:4783',
-      '/assets': 'http://127.0.0.1:4783',
+      '/cdn': 'http://127.0.0.1:4783',
+      '/u': 'http://127.0.0.1:4783',
       '/manifest.json': 'http://127.0.0.1:4783',
       '/health': 'http://127.0.0.1:4783',
       '/ws': {

@@ -113,7 +113,7 @@ export async function handleManifest(request: Request, env: Env): Promise<Respon
       .filter((object) => object.key !== '__manifest.json')
       .map((object) => ({
         key: object.key,
-        url: `/assets/${object.key}`,
+        url: `/cdn/${object.key}`,
         contentType: object.customMetadata?.contentType ?? contentTypeForKey(object.key),
         bytes: object.size,
         sha256: object.customMetadata?.sha256 ?? '',

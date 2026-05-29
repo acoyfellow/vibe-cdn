@@ -98,7 +98,7 @@ export async function seedLocal(options: SeedOptions): Promise<SeedResult> {
     generatedAt: new Date().toISOString(),
     assets: fixtures.map((f) => ({
       key: f.key,
-      url: `/assets/${f.key}`,
+      url: `/cdn/${f.key}`,
       contentType: f.contentType,
       bytes: f.bytes,
       sha256: f.sha256,

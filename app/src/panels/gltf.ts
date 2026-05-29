@@ -19,14 +19,14 @@ const ASSETS: AssetSpec[] = [
   {
     key: 'car',
     label: 'Ferrari',
-    path: '/assets/demo/car.glb',
+    path: '/cdn/demo/car.glb',
     blurb: '~1.6 MB PBR car body, clearcoat paint, transmission glass — three.js reference racing asset.',
     camera: [4.2, 1.6, 5.0],
   },
   {
     key: 'helmet',
     label: 'Helmet',
-    path: '/assets/demo/helmet.glb',
+    path: '/cdn/demo/helmet.glb',
     blurb: '~3.7 MB Khronos Damaged Helmet, embedded PBR textures, emissive details.',
     camera: [2.6, 1.6, 2.6],
   },
