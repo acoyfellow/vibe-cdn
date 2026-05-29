@@ -8,7 +8,7 @@
     "directory": "./app/dist",
     "binding": "APP_ASSETS",
     "not_found_handling": "single-page-application",
-    "run_worker_first": ["/embed", "/embed/*", "/demo", "/install", "/docs"]
+    "run_worker_first": ["/embed", "/embed/*", "/demo", "/install", "/docs", "/health", "/manifest.json", "/assets/*", "/__dev/*", "/api/*", "/u/*", "/ws/*"]
   },
   "vars": {
     "ENVIRONMENT": "local",
@@ -93,7 +93,7 @@
         "directory": "./app/dist",
         "binding": "APP_ASSETS",
         "not_found_handling": "single-page-application",
-        "run_worker_first": ["/embed", "/embed/*", "/demo", "/install", "/docs"]
+        "run_worker_first": ["/embed", "/embed/*", "/demo", "/install", "/docs", "/health", "/manifest.json", "/assets/*", "/__dev/*", "/api/*", "/u/*", "/ws/*"]
       },
       "observability": { "enabled": true }
     }

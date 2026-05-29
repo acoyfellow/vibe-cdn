@@ -47,39 +47,83 @@ const hero = el('section', {
         }),
       ],
     }),
-    // Live multiplayer arena embedded as the hero proof.
+    // The absurd 3D logo splash as the hero brand visual.
     el('div', {
-      class: 'home-hero-stage',
+      class: 'home-hero-art',
       children: [
-        el('div', {
-          class: 'home-iframe-frame',
-          children: [
-            el('iframe', {
-              class: 'home-iframe',
-              attrs: {
-                src: '/embed/arena',
-                title: 'Live multiplayer arena',
-                loading: 'eager',
-                allow: 'autoplay',
-              },
-            }),
-            el('a', {
-              class: 'home-iframe-open',
-              attrs: { href: '/demo' },
-              text: 'open the full demo →',
-            }),
-          ],
-        }),
-        el('p', {
-          class: 'home-iframe-caption',
-          text:
-            'Live. Multiplayer. Other tabs on this URL are in there with you. Click and drive with WASD.',
+        el('img', {
+          class: 'home-hero-logo',
+          attrs: {
+            src: '/brand/logo-splash.jpg',
+            alt: 'vibe-cdn logo: a chrome v glazed in molten Cloudflare orange',
+            loading: 'eager',
+            width: '520',
+            height: '520',
+          },
         }),
       ],
     }),
   ],
 })
 root.appendChild(hero)
+
+// ── Full-bleed 3D racetrack hero banner ──────────────────────────────────
+const banner = el('section', {
+  class: 'home-banner',
+  children: [
+    el('img', {
+      class: 'home-banner-img',
+      attrs: {
+        src: '/brand/hero-racetrack.jpg',
+        alt: 'A chrome v on a racetrack with a Ferrari mid-donut in a ring of orange light',
+        loading: 'lazy',
+        width: '1280',
+        height: '720',
+      },
+    }),
+    el('div', {
+      class: 'home-banner-overlay',
+      children: [
+        el('p', { class: 'home-banner-kicker', text: 'the demo is a live multiplayer arena' }),
+        el('a', { class: 'home-cta-primary', attrs: { href: '/demo' }, text: 'drive it →' }),
+      ],
+    }),
+  ],
+})
+root.appendChild(banner)
+
+// ── Live arena (moved below the banner) ──────────────────────────────────
+const liveArena = el('section', {
+  class: 'home-live site-page',
+  children: [
+    el('h2', { class: 'home-h', text: 'live, right now' }),
+    el('div', {
+      class: 'home-iframe-frame',
+      children: [
+        el('iframe', {
+          class: 'home-iframe',
+          attrs: {
+            src: '/embed/arena',
+            title: 'Live multiplayer arena',
+            loading: 'lazy',
+            allow: 'autoplay',
+          },
+        }),
+        el('a', {
+          class: 'home-iframe-open',
+          attrs: { href: '/demo' },
+          text: 'open the full demo →',
+        }),
+      ],
+    }),
+    el('p', {
+      class: 'home-iframe-caption',
+      text:
+        'Live. Multiplayer. Other tabs on this URL are in there with you. Click and drive with WASD.',
+    }),
+  ],
+})
+root.appendChild(liveArena)
 
 // ── Why three cards ────────────────────────────────────────────────────
 const why = el('section', {
