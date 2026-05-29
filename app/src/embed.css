@@ -69,8 +69,8 @@ html, body, #app.embed-mode {
   justify-content: center;
   width: 18px;
   height: 18px;
-  background: var(--ink);
-  color: var(--canvas);
+  background: var(--cf-orange);
+  color: #ffffff;
   border-radius: 4px;
   font-weight: 800;
   font-size: 12px;

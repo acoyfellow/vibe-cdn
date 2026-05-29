@@ -1,27 +1,35 @@
 /*
- * Codex design system, tuned to the developers.cloudflare.com vibe.
+ * Cloudflare-branded design system.
  *
- *   - Edge-to-edge white canvas (#fff, same as the docs site).
- *   - Black is the structural color; one Cloudflare-blue accent (#2e69ff).
+ *   - Edge-to-edge white canvas (#fff).
+ *   - Cloudflare orange (#FF5E1F) is the primary brand + CTA color.
+ *   - Soft-black text (#262626), light-to-medium heading weights.
  *   - Cloudflare's exact system font stack (no web-font download).
- *   - Pill geometry on every interactive element.
- *   - No shadows. No gradients. No tinted surfaces. No decorative illustration.
- *   - Semantic color only for state feedback.
+ *   - Generous radii on interactive elements.
+ *   - No shadows. No gradients. Restrained surfaces.
+ *   - Sampled from cloudflare.com + developers.cloudflare.com live tokens.
  */
 
 :root {
-  /* Palette — sampled from developers.cloudflare.com design tokens. */
-  --canvas:        #ffffff;  /* --sl-color-bg */
-  --ink:           #000000;  /* structural black (sharper than docs' #383838) */
-  --text-primary:  #383838;  /* --sl-color-text */
-  --text-muted:    #5a5a5a;
-  --text-soft:     #767676;
-  --hairline:      #e5e7eb;
-  --hairline-soft: #f3f4f6;
+  /* Palette — Cloudflare brand. */
+  --canvas:        #ffffff;
+  --ink:           #262626;  /* primary text (cloudflare.com body) */
+  --text-primary:  #262626;
+  --text-muted:    #595959;
+  --text-soft:     #808080;
+  --hairline:      #e6e6e6;
+  --hairline-soft: #f4f4f4;
+  --line-strong:   #d4d4d4;
 
-  /* The one accent. Cloudflare blue. Used sparingly for links + focus. */
-  --accent:        #2e69ff;  /* --sl-color-accent */
-  --accent-hover:  #1f54d6;
+  /* Cloudflare orange. The brand. Primary CTAs, active states, accents. */
+  --cf-orange:        #ff5e1f;  /* cloudflare.com primary button */
+  --cf-orange-soft:   #ff7038;  /* secondary / hover-light */
+  --cf-orange-hover:  #f04e10;  /* primary hover (darker) */
+  --cf-orange-tint:   #fff3ee;  /* faint orange wash for surfaces */
+
+  /* Brand aliases used across components. */
+  --accent:        var(--cf-orange);
+  --accent-hover:  var(--cf-orange-hover);
 
   /* Semantic state only — never decorative */
   --success: #16a34a;
@@ -171,9 +179,9 @@ code, .mono {
 }
 
 .drop-zone.drop-hot {
-  background: var(--ink);
-  color: var(--canvas);
-  border-color: var(--ink);
+  background: var(--cf-orange);
+  color: #ffffff;
+  border-color: var(--cf-orange);
   border-style: solid;
   transform: scale(1.005);
 }
@@ -285,8 +293,9 @@ code, .mono {
 
 .copy-btn:hover,
 .reset-btn:hover {
-  background: var(--ink);
-  color: var(--canvas);
+  background: var(--cf-orange);
+  color: #ffffff;
+  border-color: var(--cf-orange);
 }
 
 .reset-btn {
@@ -305,20 +314,21 @@ code, .mono {
 
 .cta-deploy {
   display: inline-block;
-  background: var(--ink);
-  color: var(--canvas);
-  border: 1px solid var(--ink);
+  background: var(--cf-orange);
+  color: #ffffff;
+  border: 1px solid var(--cf-orange);
   border-radius: var(--radius-pill);
   padding: 8px 18px;
   font-family: var(--font-primary);
   font-size: var(--text-sm);
   font-weight: 600;
   text-decoration: none;
-  transition: opacity 120ms ease;
+  transition: background 120ms ease;
 }
 
 .cta-deploy:hover {
-  opacity: 0.85;
+  background: var(--cf-orange-hover);
+  border-color: var(--cf-orange-hover);
 }
 
 .race-help {
@@ -544,11 +554,11 @@ code, .mono {
 
 .form-grid .text-input { width: 100%; }
 
-/* ── Buttons (primary, pill, black) ───────────────────────────────────── */
+/* ── Buttons (primary, pill, Cloudflare orange) ───────────────────────── */
 
 .big-btn {
-  background: var(--ink);
-  color: var(--canvas);
+  background: var(--cf-orange);
+  color: #ffffff;
   border: 1px solid var(--ink);
   border-radius: var(--radius-pill);
   font-family: var(--font-primary);
@@ -560,14 +570,15 @@ code, .mono {
   transition: opacity 120ms ease;
 }
 
-.big-btn:hover { opacity: 0.85; }
+.big-btn { border-color: var(--cf-orange); }
+.big-btn:hover { background: var(--cf-orange-hover); border-color: var(--cf-orange-hover); opacity: 1; }
 
 .big-btn:focus-visible {
-  outline: 2px solid var(--ink);
+  outline: 2px solid var(--cf-orange);
   outline-offset: 3px;
 }
 
-.big-btn:active { opacity: 0.7; }
+.big-btn:active { background: var(--cf-orange-hover); }
 
 .big-btn:disabled {
   opacity: 0.45;

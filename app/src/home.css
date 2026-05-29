@@ -50,19 +50,20 @@
 
 .home-cta-primary {
   display: inline-block;
-  background: var(--ink);
-  color: var(--canvas);
+  background: var(--cf-orange);
+  color: #ffffff;
   font-weight: 600;
   font-size: var(--text-md);
   padding: 12px 22px;
   border-radius: var(--radius-pill);
-  border: 1px solid var(--ink);
+  border: 1px solid var(--cf-orange);
   text-decoration: none;
-  transition: opacity 120ms ease;
+  transition: background 120ms ease;
 }
 
 .home-cta-primary:hover {
-  opacity: 0.85;
+  background: var(--cf-orange-hover);
+  border-color: var(--cf-orange-hover);
 }
 
 .home-cta-secondary {
@@ -73,14 +74,14 @@
   font-size: var(--text-md);
   padding: 12px 22px;
   border-radius: var(--radius-pill);
-  border: 1px solid var(--ink);
+  border: 1px solid var(--line-strong);
   text-decoration: none;
-  transition: background 120ms ease, color 120ms ease;
+  transition: border-color 120ms ease, color 120ms ease;
 }
 
 .home-cta-secondary:hover {
-  background: var(--ink);
-  color: var(--canvas);
+  border-color: var(--cf-orange);
+  color: var(--cf-orange);
 }
 
 .home-hero-stage {
@@ -230,12 +231,12 @@
   justify-content: center;
   width: 44px;
   height: 44px;
-  border: 2px solid var(--ink);
+  border: 2px solid var(--cf-orange);
   border-radius: 50%;
   font-weight: 700;
   font-size: var(--text-lg);
-  color: var(--ink);
-  background: var(--canvas);
+  color: var(--cf-orange);
+  background: var(--cf-orange-tint);
 }
 
 .home-step-h {

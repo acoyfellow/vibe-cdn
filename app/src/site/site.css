@@ -43,8 +43,8 @@
   justify-content: center;
   width: 26px;
   height: 26px;
-  background: var(--ink);
-  color: var(--canvas);
+  background: var(--cf-orange);
+  color: #ffffff;
   border-radius: 6px;
   font-weight: 800;
   font-size: 16px;
@@ -89,19 +89,20 @@
 }
 
 .site-nav-cta {
-  background: var(--ink);
-  color: var(--canvas);
+  background: var(--cf-orange);
+  color: #ffffff;
   text-decoration: none;
   font-size: var(--text-sm);
   font-weight: 600;
   padding: 8px 16px;
   border-radius: var(--radius-pill);
-  border: 1px solid var(--ink);
-  transition: opacity 120ms ease;
+  border: 1px solid var(--cf-orange);
+  transition: background 120ms ease;
 }
 
 .site-nav-cta:hover {
-  opacity: 0.85;
+  background: var(--cf-orange-hover);
+  border-color: var(--cf-orange-hover);
 }
 
 @media (max-width: 600px) {
