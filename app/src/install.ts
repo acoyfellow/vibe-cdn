@@ -35,11 +35,72 @@ const main = el('main', {
       ],
     }),
 
+    // ── Honest prerequisites. The part most starter repos hide. ──────────────
+    el('section', {
+      class: 'install-prereq',
+      children: [
+        el('h2', { class: 'install-prereq-h', text: 'before you start — the honest version' }),
+        el('p', {
+          class: 'install-prereq-lead',
+          html:
+            'Running the demo on your laptop is <strong>free and needs nothing but Bun</strong>. ' +
+            'Deploying the <em>multiplayer</em> version to the internet needs a paid Cloudflare plan. ' +
+            'Here is exactly what each path costs and requires — no surprises on your card.',
+        }),
+        el('div', {
+          class: 'prereq-grid',
+          children: [
+            prereqCard({
+              tier: 'run it locally',
+              price: '$0',
+              priceNote: 'forever',
+              needs: [
+                'Bun installed (bun.sh)',
+                'that is the whole list',
+              ],
+              note: 'Miniflare emulates R2, D1, KV, and Durable Objects on your machine. No account, no card, no internet. This is the `bun run demo` path.',
+              tone: 'free',
+            }),
+            prereqCard({
+              tier: 'deploy assets + CDN',
+              price: '$0',
+              priceNote: 'free tier',
+              needs: [
+                'a free Cloudflare account',
+                'wrangler login (once)',
+              ],
+              note: 'R2, D1, KV, and a single Worker all have generous free tiers. A small game lives here at $0/mo. R2 has no egress fee, so asset delivery stays free as you grow.',
+              tone: 'free',
+            }),
+            prereqCard({
+              tier: 'deploy multiplayer',
+              price: '$5',
+              priceNote: 'per month, minimum',
+              needs: [
+                'a Cloudflare account',
+                'the Workers Paid plan ($5/mo)',
+              ],
+              note: 'The live arena uses SQLite-backed Durable Objects, which require the Workers Paid plan. That $5/mo is a flat platform fee (not per-game) and covers 10M requests + plenty of DO usage. If you do not need realtime multiplayer, skip the DO and stay on free.',
+              tone: 'paid',
+            }),
+          ],
+        }),
+        el('p', {
+          class: 'install-prereq-foot',
+          html:
+            'The one number that matters at scale: <strong>R2 egress is $0</strong>. A viral game that would cost five figures a month on a per-GB CDN ' +
+            'costs single-digit dollars here — mostly the flat $5 Workers fee plus tiny storage. See the ' +
+            '<a href="' + brand.repo + '/blob/main/docs/costs.md" target="_blank" rel="noreferrer">cost breakdown</a> ' +
+            'for the math at 1k / 50k / 5M players.',
+        }),
+      ],
+    }),
+
     optionCard({
       tag: 'option 1',
       title: 'one click → your Cloudflare account',
       blurb:
-        "Cloudflare provisions R2, D1, KV, Workers, and points the worker at your account. Forty seconds, no terminal. You get a workers.dev URL you can put anywhere.",
+        "Cloudflare forks the repo, provisions R2, D1, KV, and the Worker, and deploys. No terminal. You get a workers.dev URL. Note: the multiplayer arena needs the Workers Paid plan ($5/mo) because it uses Durable Objects — Cloudflare will prompt you to upgrade if you are on free.",
       action: {
         label: 'deploy to Cloudflare',
         href: `https://deploy.workers.cloudflare.com/?url=${brand.repo}`,
@@ -179,6 +240,35 @@ function ownItem(label: string, detail: string): HTMLElement {
     children: [
       el('span', { class: 'install-own-label', text: label }),
       el('span', { class: 'install-own-detail', text: detail }),
+    ],
+  })
+}
+
+type PrereqCard = {
+  tier: string
+  price: string
+  priceNote: string
+  needs: string[]
+  note: string
+  tone: 'free' | 'paid'
+}
+function prereqCard(p: PrereqCard): HTMLElement {
+  return el('div', {
+    class: `prereq-card prereq-${p.tone}`,
+    children: [
+      el('div', {
+        class: 'prereq-price-row',
+        children: [
+          el('span', { class: 'prereq-price', text: p.price }),
+          el('span', { class: 'prereq-price-note', text: p.priceNote }),
+        ],
+      }),
+      el('h3', { class: 'prereq-tier', text: p.tier }),
+      el('ul', {
+        class: 'prereq-needs',
+        children: p.needs.map((n) => el('li', { text: n })),
+      }),
+      el('p', { class: 'prereq-note', text: p.note }),
     ],
   })
 }

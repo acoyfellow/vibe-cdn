@@ -67,32 +67,7 @@ const hero = el('section', {
 })
 root.appendChild(hero)
 
-// ── Full-bleed 3D racetrack hero banner ──────────────────────────────────
-const banner = el('section', {
-  class: 'home-banner',
-  children: [
-    el('img', {
-      class: 'home-banner-img',
-      attrs: {
-        src: '/brand/hero-racetrack.jpg',
-        alt: 'A chrome v on a racetrack with a Ferrari mid-donut in a ring of orange light',
-        loading: 'lazy',
-        width: '1280',
-        height: '720',
-      },
-    }),
-    el('div', {
-      class: 'home-banner-overlay',
-      children: [
-        el('p', { class: 'home-banner-kicker', text: 'the demo is a live multiplayer arena' }),
-        el('a', { class: 'home-cta-primary', attrs: { href: '/demo' }, text: 'drive it →' }),
-      ],
-    }),
-  ],
-})
-root.appendChild(banner)
-
-// ── Live arena (moved below the banner) ──────────────────────────────────
+// ── Live arena ───────────────────────────────────────────────────────────
 const liveArena = el('section', {
   class: 'home-live site-page',
   children: [
@@ -150,6 +125,25 @@ const why = el('section', {
   ],
 })
 root.appendChild(why)
+
+// ── Decorative 3D racetrack band (visual only, no competing CTA) ─────────
+const band = el('section', {
+  class: 'home-band',
+  attrs: { 'aria-hidden': 'true' },
+  children: [
+    el('img', {
+      class: 'home-band-img',
+      attrs: {
+        src: '/brand/hero-racetrack.jpg',
+        alt: '',
+        loading: 'lazy',
+        width: '1280',
+        height: '720',
+      },
+    }),
+  ],
+})
+root.appendChild(band)
 
 // ── How three steps ────────────────────────────────────────────────────
 const how = el('section', {

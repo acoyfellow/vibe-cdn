@@ -106,43 +106,24 @@
   mix-blend-mode: multiply; /* white bg of the render melts into the page */
 }
 
-/* Full-bleed 3D racetrack banner */
-.home-banner {
-  position: relative;
+/* Decorative 3D racetrack band — visual punctuation between sections.
+   No overlay, no CTA. Edges fade into the white canvas so it reads as
+   art, not a banner competing with the live demo. */
+.home-band {
   width: 100%;
   margin: var(--space-8) 0;
   overflow: hidden;
-  background: #0a0a0a;
+  line-height: 0;
 }
 
-.home-banner-img {
+.home-band-img {
   width: 100%;
   height: auto;
   display: block;
-  max-height: 460px;
+  max-height: 380px;
   object-fit: cover;
-}
-
-.home-banner-overlay {
-  position: absolute;
-  left: 0;
-  bottom: 0;
-  right: 0;
-  padding: var(--space-6);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-4);
-  background: linear-gradient(to top, rgba(0,0,0,0.55), transparent);
-}
-
-.home-banner-kicker {
-  margin: 0;
-  color: #fff;
-  font-size: var(--text-lg);
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  text-shadow: 0 1px 12px rgba(0,0,0,0.5);
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 12%, #000 88%, transparent);
+  mask-image: linear-gradient(to right, transparent, #000 12%, #000 88%, transparent);
 }
 
 /* Live arena section */
