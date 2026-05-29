@@ -80,19 +80,28 @@ export default {
     for (const [prefix, target] of Object.entries(pageMap)) {
       if (url.pathname === prefix || url.pathname.startsWith(prefix + '/')) {
         if (env.APP_ASSETS) {
+          // Map the pretty path to the canonical extensionless asset path.
+          // The assets binding serves /embed.html at /embed (it strips the
+          // .html and 307s). So we request the extensionless form directly
+          // and let the binding resolve it. We also send a NON-navigate
+          // request: a browser iframe sends `Sec-Fetch-Mode: navigate`,
+          // which makes the SPA `not_found_handling` serve index.html
+          // (the homepage) for any path it doesn't recognize. By issuing
+          // our own bare GET (no Sec-Fetch headers) and pointing at the
+          // exact extensionless asset, we get the right page every time.
+          // wrangler `run_worker_first` ensures this code runs before the
+          // assets binding's SPA fallback. We fetch the literal .html file;
+          // the binding may 307 it to the extensionless form, which we
+          // follow, landing on the right page content.
           const assetUrl = new URL(request.url)
           assetUrl.pathname = target
-          const assetReq = new Request(assetUrl.toString(), { method: 'GET', redirect: 'manual' })
-          let res = await env.APP_ASSETS.fetch(assetReq)
-          if (res.status >= 300 && res.status < 400) {
-            const loc = res.headers.get('location')
-            if (loc) {
-              const followUrl = new URL(loc, assetUrl)
-              res = await env.APP_ASSETS.fetch(new Request(followUrl.toString(), { method: 'GET' }))
-            }
-          }
+          assetUrl.search = ''
+          const res = await env.APP_ASSETS.fetch(
+            new Request(assetUrl.toString(), { method: 'GET', redirect: 'follow' }),
+          )
           const headers = new Headers(res.headers)
           headers.set('cache-control', 'public, max-age=60')
+          headers.set('content-type', 'text/html; charset=utf-8')
           return new Response(res.body, { status: res.status, headers })
         }
       }

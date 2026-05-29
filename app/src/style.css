@@ -1,32 +1,41 @@
 /*
- * Codex design system.
+ * Codex design system, tuned to the developers.cloudflare.com vibe.
  *
- *   - Edge-to-edge white canvas.
- *   - Black is the only filled UI color.
- *   - Typography (Open Sans + JetBrains Mono) carries hierarchy.
+ *   - Edge-to-edge white canvas (#fff, same as the docs site).
+ *   - Black is the structural color; one Cloudflare-blue accent (#2e69ff).
+ *   - Cloudflare's exact system font stack (no web-font download).
  *   - Pill geometry on every interactive element.
  *   - No shadows. No gradients. No tinted surfaces. No decorative illustration.
  *   - Semantic color only for state feedback.
  */
 
 :root {
-  /* Palette */
-  --canvas:        #ffffff;
-  --ink:           #000000;
-  --text-primary:  #111827;
-  --text-muted:    #4b5563;
-  --text-soft:     #6b7280;
+  /* Palette — sampled from developers.cloudflare.com design tokens. */
+  --canvas:        #ffffff;  /* --sl-color-bg */
+  --ink:           #000000;  /* structural black (sharper than docs' #383838) */
+  --text-primary:  #383838;  /* --sl-color-text */
+  --text-muted:    #5a5a5a;
+  --text-soft:     #767676;
   --hairline:      #e5e7eb;
   --hairline-soft: #f3f4f6;
+
+  /* The one accent. Cloudflare blue. Used sparingly for links + focus. */
+  --accent:        #2e69ff;  /* --sl-color-accent */
+  --accent-hover:  #1f54d6;
 
   /* Semantic state only — never decorative */
   --success: #16a34a;
   --warning: #d97706;
   --danger:  #dc2626;
 
-  /* Typography */
-  --font-primary: 'Open Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --font-mono:    'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  /* Typography — Cloudflare's modern system font stack. No web-font
+     download: renders the native grotesk on every OS, instant paint.
+     Matches the stack on developers.cloudflare.com. */
+  --font-primary: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, 'Noto Sans', sans-serif, 'Apple Color Emoji',
+    'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    'Liberation Mono', 'Courier New', monospace;
 
   /* Type scale */
   --text-xs:  12px;
