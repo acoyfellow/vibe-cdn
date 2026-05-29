@@ -67,26 +67,34 @@ export default {
       return env.LOBBY.get(id).fetch(request)
     }
 
-    // Pretty embed routes: /embed/<panel> proxies the embed.html bundle.
-    // We fetch the asset via APP_ASSETS, strip any 30x redirect response,
-    // and return the body as 200 so iframes don't bounce.
-    if (url.pathname === '/embed' || url.pathname.startsWith('/embed/')) {
-      if (env.APP_ASSETS) {
-        const assetUrl = new URL(request.url)
-        assetUrl.pathname = '/embed.html'
-        const assetReq = new Request(assetUrl.toString(), { method: 'GET', redirect: 'manual' })
-        let res = await env.APP_ASSETS.fetch(assetReq)
-        if (res.status >= 300 && res.status < 400) {
-          const loc = res.headers.get('location')
-          if (loc) {
-            const followUrl = new URL(loc, assetUrl)
-            res = await env.APP_ASSETS.fetch(new Request(followUrl.toString(), { method: 'GET' }))
+    // Pretty page routes. /demo, /install, /docs, /embed and their
+    // subpaths all proxy a specific HTML bundle. Fetching the asset
+    // through APP_ASSETS sometimes triggers an internal trailing-slash
+    // redirect; we follow it once and rewrap so the user only sees 200.
+    const pageMap: Record<string, string> = {
+      '/demo': '/demo.html',
+      '/install': '/install.html',
+      '/docs': '/docs.html',
+      '/embed': '/embed.html',
+    }
+    for (const [prefix, target] of Object.entries(pageMap)) {
+      if (url.pathname === prefix || url.pathname.startsWith(prefix + '/')) {
+        if (env.APP_ASSETS) {
+          const assetUrl = new URL(request.url)
+          assetUrl.pathname = target
+          const assetReq = new Request(assetUrl.toString(), { method: 'GET', redirect: 'manual' })
+          let res = await env.APP_ASSETS.fetch(assetReq)
+          if (res.status >= 300 && res.status < 400) {
+            const loc = res.headers.get('location')
+            if (loc) {
+              const followUrl = new URL(loc, assetUrl)
+              res = await env.APP_ASSETS.fetch(new Request(followUrl.toString(), { method: 'GET' }))
+            }
           }
+          const headers = new Headers(res.headers)
+          headers.set('cache-control', 'public, max-age=60')
+          return new Response(res.body, { status: res.status, headers })
         }
-        // Rewrap so we control caching headers for the embed route.
-        const headers = new Headers(res.headers)
-        headers.set('cache-control', 'public, max-age=60')
-        return new Response(res.body, { status: res.status, headers })
       }
     }
 

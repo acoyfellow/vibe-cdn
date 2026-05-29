@@ -9,7 +9,10 @@ export default defineConfig({
     sourcemap: true,
     rollupOptions: {
       input: {
-        main: resolve(__dirname, 'app/index.html'),
+        home: resolve(__dirname, 'app/index.html'),
+        demo: resolve(__dirname, 'app/demo.html'),
+        install: resolve(__dirname, 'app/install.html'),
+        docs: resolve(__dirname, 'app/docs.html'),
         embed: resolve(__dirname, 'app/embed.html'),
       },
     },

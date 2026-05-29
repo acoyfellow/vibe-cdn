@@ -1,0 +1,202 @@
+/* Site chrome: nav + footer + page-level scaffolding.
+   Distinct from the demo's panel styles. Codex aesthetic preserved. */
+
+.site-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.site-shell main {
+  flex: 1;
+}
+
+/* ── Nav ─────────────────────────────────────────────────────────────── */
+
+.site-nav {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: var(--canvas);
+  border-bottom: 1px solid var(--ink);
+  padding: var(--space-3) var(--space-6);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  max-width: 1100px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.site-nav-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  color: var(--ink);
+}
+
+.site-nav-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  background: var(--ink);
+  color: var(--canvas);
+  border-radius: 6px;
+  font-weight: 800;
+  font-size: 16px;
+  line-height: 1;
+  letter-spacing: -0.05em;
+}
+
+.site-nav-wordmark {
+  font-size: var(--text-lg);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.site-nav-links {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.site-nav-link {
+  color: var(--text-muted);
+  text-decoration: none;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  padding: 6px 0;
+  border-bottom: 2px solid transparent;
+  transition: color 120ms ease, border-color 120ms ease;
+}
+
+.site-nav-link:hover {
+  color: var(--ink);
+}
+
+.site-nav-link-active {
+  color: var(--ink);
+  border-bottom-color: var(--ink);
+}
+
+.site-nav-github {
+  /* keep as text link */
+}
+
+.site-nav-cta {
+  background: var(--ink);
+  color: var(--canvas);
+  text-decoration: none;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  padding: 8px 16px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--ink);
+  transition: opacity 120ms ease;
+}
+
+.site-nav-cta:hover {
+  opacity: 0.85;
+}
+
+@media (max-width: 600px) {
+  .site-nav {
+    padding: var(--space-3) var(--space-4);
+  }
+  .site-nav-links {
+    gap: var(--space-3);
+  }
+  .site-nav-github {
+    display: none;
+  }
+}
+
+/* ── Page wrapper ────────────────────────────────────────────────────── */
+
+.site-page {
+  max-width: 1100px;
+  margin: 0 auto;
+  width: 100%;
+  padding: 0 var(--space-6);
+  box-sizing: border-box;
+}
+
+.site-page-narrow {
+  max-width: 760px;
+}
+
+/* ── Footer ──────────────────────────────────────────────────────────── */
+
+.site-foot {
+  margin-top: var(--space-8);
+  border-top: 1px solid var(--ink);
+  padding: var(--space-8) var(--space-6);
+  max-width: 1100px;
+  margin-left: auto;
+  margin-right: auto;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.site-foot-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-6);
+  margin-bottom: var(--space-6);
+}
+
+.site-foot-col h4 {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  margin: 0 0 var(--space-3);
+  color: var(--text-muted);
+}
+
+.site-foot-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.site-foot-link {
+  color: var(--ink);
+  text-decoration: none;
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+.site-foot-link:hover {
+  text-decoration: underline;
+}
+
+.site-foot-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--hairline);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.site-foot-egress {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+@media (max-width: 600px) {
+  .site-foot-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
