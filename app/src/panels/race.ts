@@ -5,9 +5,10 @@
 // shares the same Durable Object room and sees the others as ghost cars
 // synced at 20 Hz with snapshot interpolation.
 //
-// Until the visitor takes the wheel, the car ambient-drives a slow lazy
-// figure-8 in the center of the arena. Press any movement key and you
-// take over. Top speed achieved this session is the leaderboard score.
+// Until the visitor takes the wheel, the car sits parked while the camera
+// slowly orbits it (showroom turntable) — alive, but not wandering off.
+// Press any movement key and you take over. Top speed achieved this
+// session is the leaderboard score.
 
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
@@ -318,7 +319,12 @@ export function racePanel(): HTMLElement {
     const anyKey = keys.w || keys.a || keys.s || keys.d
     if (anyKey && !userHasDriven) userHasDriven = true
     if (!userHasDriven) {
-      idleCruise(dt)
+      // Parked. The car does NOT move on its own — driving yourself off into
+      // the distance while someone is just scrolling the page is disorienting.
+      // We keep it perfectly still; the showroom camera (updateCamera) does
+      // the gentle motion instead. Speed stays 0.
+      speed = 0
+      hudSpeed.textContent = '0'
       return
     }
     if (keys.w) speed += ACCEL * dt
@@ -335,31 +341,6 @@ export function racePanel(): HTMLElement {
     carGroup.position.x += carForward.x * speed * dt
     carGroup.position.z += carForward.z * speed * dt
 
-    hudSpeed.textContent = String(Math.round(Math.abs(speed) * 2.2))
-  }
-
-  // Slow lazy figure-8 around the origin — so the page is alive on first load.
-  const idleCruise = (dt: number) => {
-    const tSec = (performance.now() - idleStartedAt) / 1000
-    // Lissajous-style figure-8: x = A sin(ωt), z = A sin(2ωt)/2
-    const A = 35
-    const W = 0.12
-    const targetX = A * Math.sin(W * tSec)
-    const targetZ = (A / 2) * Math.sin(2 * W * tSec)
-    const dx = targetX - carGroup.position.x
-    const dz = targetZ - carGroup.position.z
-    const dist = Math.hypot(dx, dz)
-    if (dist > 0.01) {
-      const targetYaw = Math.atan2(dx, dz)
-      let dy = targetYaw - carGroup.rotation.y
-      if (dy > Math.PI) dy -= Math.PI * 2
-      if (dy < -Math.PI) dy += Math.PI * 2
-      carGroup.rotation.y += dy * Math.min(1, dt * 2.5)
-    }
-    speed += (10 - speed) * Math.min(1, dt * 0.6)
-    carForward.set(Math.sin(carGroup.rotation.y), 0, Math.cos(carGroup.rotation.y))
-    carGroup.position.x += carForward.x * speed * dt
-    carGroup.position.z += carForward.z * speed * dt
     hudSpeed.textContent = String(Math.round(Math.abs(speed) * 2.2))
   }
 
@@ -386,6 +367,25 @@ export function racePanel(): HTMLElement {
   }
 
   const updateCamera = () => {
+    if (!userHasDriven) {
+      // Showroom turntable: slowly orbit the parked car so the scene feels
+      // alive without the car going anywhere. Stops the instant you drive.
+      const tSec = (performance.now() - idleStartedAt) / 1000
+      const angle = tSec * 0.18 // ~35s per revolution
+      const radius = 9
+      const height = 4.2
+      camTmp.set(
+        carGroup.position.x + Math.sin(angle) * radius,
+        carGroup.position.y + height,
+        carGroup.position.z + Math.cos(angle) * radius,
+      )
+      camera.position.lerp(camTmp, 0.06)
+      lookTmp.copy(carGroup.position)
+      lookTmp.y += 0.6
+      camera.lookAt(lookTmp.x, lookTmp.y, lookTmp.z)
+      return
+    }
+    // Chase cam once driving.
     camTmp.copy(camOffset).applyQuaternion(carGroup.quaternion)
     camTmp.add(carGroup.position)
     camera.position.lerp(camTmp, 0.18)
@@ -472,8 +472,7 @@ export function racePanel(): HTMLElement {
       el('p', {
         class: 'help race-help',
         html:
-          '<strong>click the stage, then WASD or arrows.</strong> ' +
-          'Until you take over, the car drives itself in a lazy figure-8. ' +
+          '<strong>click the stage, then WASD or arrows to drive.</strong> ' +
           'Open a second tab and you appear as a ghost car — every visitor on this URL shares the arena.',
       }),
       controlsRow,
@@ -530,44 +529,45 @@ function hudCell(label: string, valueEl: HTMLElement, sub: string): HTMLElement 
   })
 }
 
+// One texture tile covers this many world units. Smaller = denser grid =
+// stronger sense of motion. 6 units per tile gives a clear reference grid.
+const FLOOR_TILE_UNITS = 6
+
 function buildArenaFloor(): THREE.Mesh {
-  // A large flat plane, white asphalt-ish, with a dark grid texture.
   const size = ARENA_HALF * 2
   const geom = new THREE.PlaneGeometry(size, size)
+
+  // A single grid cell drawn once; RepeatWrapping tiles it across the floor.
   const canvas = document.createElement('canvas')
-  canvas.width = 512
-  canvas.height = 512
+  canvas.width = 256
+  canvas.height = 256
   const g = canvas.getContext('2d')!
-  // Light asphalt base
-  g.fillStyle = '#cccccc'
-  g.fillRect(0, 0, 512, 512)
-  // Thin grid lines every 32 px
-  g.strokeStyle = '#444444'
-  g.lineWidth = 1
-  for (let i = 0; i <= 512; i += 32) {
-    g.beginPath()
-    g.moveTo(i, 0)
-    g.lineTo(i, 512)
-    g.moveTo(0, i)
-    g.lineTo(512, i)
-    g.stroke()
-  }
-  // Thicker major grid lines every 128 px
-  g.strokeStyle = '#1a1a1a'
-  g.lineWidth = 2
-  for (let i = 0; i <= 512; i += 128) {
-    g.beginPath()
-    g.moveTo(i, 0)
-    g.lineTo(i, 512)
-    g.moveTo(0, i)
-    g.lineTo(512, i)
-    g.stroke()
-  }
+  // Light asphalt base with a faint checker so adjacent tiles read distinctly.
+  g.fillStyle = '#d8d8d8'
+  g.fillRect(0, 0, 256, 256)
+  g.fillStyle = '#d0d0d0'
+  g.fillRect(0, 0, 128, 128)
+  g.fillRect(128, 128, 128, 128)
+  // Cell border (the grid line) on two edges so tiling makes a clean lattice.
+  g.strokeStyle = '#9a9a9a'
+  g.lineWidth = 3
+  g.beginPath()
+  g.moveTo(0, 0)
+  g.lineTo(256, 0)
+  g.moveTo(0, 0)
+  g.lineTo(0, 256)
+  g.stroke()
+  // A small center tick for extra motion reference.
+  g.fillStyle = '#bcbcbc'
+  g.fillRect(124, 124, 8, 8)
+
   const tex = new THREE.CanvasTexture(canvas)
   tex.wrapS = THREE.RepeatWrapping
   tex.wrapT = THREE.RepeatWrapping
-  // Tile the texture to make the grid dense across the whole floor.
-  ;(tex as unknown as { repeat: { set(x: number, y: number): void } }).repeat = { set(_x: number, _y: number) {} }
+  tex.anisotropy = 8
+  const tiles = size / FLOOR_TILE_UNITS
+  tex.repeat.set(tiles, tiles)
+
   const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.95, metalness: 0.0 })
   ;(mat as unknown as { map: unknown }).map = tex
   const mesh = new THREE.Mesh(geom, mat)

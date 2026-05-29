@@ -132,10 +132,20 @@ declare module 'three' {
     getTangentAt(t: number, target?: Vector3): Vector3
   }
 
+  export class Vector2 {
+    constructor(x?: number, y?: number)
+    x: number
+    y: number
+    set(x: number, y: number): this
+  }
+
   export class CanvasTexture {
     constructor(canvas: HTMLCanvasElement)
     wrapS: number
     wrapT: number
+    repeat: Vector2
+    anisotropy: number
+    needsUpdate: boolean
   }
 
   export class MeshStandardMaterial {
