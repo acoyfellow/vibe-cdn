@@ -1,4 +1,4 @@
-import type { HealthResponse } from '../shared/contracts'
+import { BRAND_NAME, BRAND_VERSION, type HealthResponse } from '../shared/contracts'
 import { estimateCost } from '../shared/pricing'
 import type { Env } from './env'
 import { LobbyDO } from './LobbyDO'
@@ -18,8 +18,8 @@ export default {
     if (url.pathname === '/health') {
       const body: HealthResponse = {
         ok: true,
-        name: 'vibe-cdn',
-        version: '0.0.1',
+        name: BRAND_NAME,
+        version: BRAND_VERSION,
         bindings: { r2: !!env.ASSETS, d1: !!env.DB, kv: !!env.SAVES, durableObjects: !!env.LOBBY },
       }
       return json(body)

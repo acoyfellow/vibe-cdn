@@ -5,6 +5,7 @@
 //      get back a short URL on Cloudflare's edge. This is the product.
 
 import { el } from './dom'
+import { brand } from './brand'
 
 type Stats = {
   assetsStored: number
@@ -51,7 +52,7 @@ export function buildHero(): HTMLElement {
   const titleRow = el('div', {
     class: 'hero-title-row',
     children: [
-      el('h1', { class: 'hero-title', text: 'vibe-cdn' }),
+      el('h1', { class: 'hero-title', text: brand.wordmark }),
       el('span', { class: 'tag', text: '0.1.0' }),
     ],
   })
@@ -310,7 +311,7 @@ function wireDropZone(
               el('a', {
                 class: 'cta-deploy',
                 attrs: {
-                  href: 'https://deploy.workers.cloudflare.com/?url=https://github.com/acoyfellow/vibe-cdn',
+                  href: `https://deploy.workers.cloudflare.com/?url=${brand.repo}`,
                   target: '_blank',
                   rel: 'noreferrer',
                 },

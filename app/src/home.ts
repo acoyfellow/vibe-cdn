@@ -4,12 +4,14 @@ import './style.css'
 import './site/site.css'
 import './home.css'
 import { el } from './dom'
+import { brand, setTitle } from './brand'
 import { buildNav } from './site/nav'
 import { buildFooter } from './site/footer'
 
 const root = document.getElementById('app')
 if (!root) throw new Error('#app missing')
 
+setTitle()
 root.classList.add('site-shell')
 
 // ── Nav ────────────────────────────────────────────────────────────────
@@ -34,9 +36,7 @@ const hero = el('section', {
         }),
         el('p', {
           class: 'home-lead',
-          text:
-            "R2 for the heavy stuff. Workers for the CDN edge. Durable Objects for multiplayer rooms. " +
-            "D1 for scores. KV for caches. Zero egress at any scale. One repo, one deploy.",
+          text: `${brand.pitch} One repo, one deploy.`,
         }),
         el('div', {
           class: 'home-cta-row',
@@ -99,7 +99,7 @@ const why = el('section', {
         ),
         whyCard(
           'one deploy',
-          'Click the deploy button or run `npx tiged acoyfellow/vibe-cdn my-game-cdn`. R2, Workers, DO, D1, KV are provisioned for you. Your domain. Your account. MIT.',
+          `Click the deploy button or run \`npx tiged ${brand.repoSlug} my-game\`. R2, Workers, DO, D1, KV are provisioned for you. Your domain. Your account. MIT.`,
         ),
       ],
     }),
@@ -118,7 +118,7 @@ const how = el('section', {
         stepItem(
           '1',
           'fork the stack',
-          'Clone the repo or use `npx tiged acoyfellow/vibe-cdn`. You get a Cloudflare Workers project with R2, DO, D1, KV pre-wired and a working multiplayer arena.',
+          `Clone the repo or use \`npx tiged ${brand.repoSlug}\`. You get a Cloudflare Workers project with R2, DO, D1, KV pre-wired and a working multiplayer arena.`,
         ),
         stepItem(
           '2',
@@ -152,7 +152,7 @@ const closer = el('section', {
         el('a', {
           class: 'home-cta-primary',
           attrs: {
-            href: 'https://deploy.workers.cloudflare.com/?url=https://github.com/acoyfellow/vibe-cdn',
+            href: `https://deploy.workers.cloudflare.com/?url=${brand.repo}`,
             target: '_blank',
             rel: 'noreferrer',
           },

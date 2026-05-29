@@ -1,7 +1,13 @@
+// Visible product name. The single source of truth for the worker side.
+// Mirrors app/src/brand.ts on the client. Rename in both places when a
+// long-term name is chosen. Infra names (buckets, db, worker) are separate.
+export const BRAND_NAME = 'vibe-cdn'
+export const BRAND_VERSION = '0.1.0'
+
 export type HealthResponse = {
   ok: true
-  name: 'vibe-cdn'
-  version: '0.0.1'
+  name: string
+  version: string
   bindings: {
     r2: boolean
     d1: boolean

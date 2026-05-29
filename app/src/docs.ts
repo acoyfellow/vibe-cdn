@@ -4,12 +4,14 @@ import './style.css'
 import './site/site.css'
 import './install.css'
 import { el } from './dom'
+import { brand, setTitle } from './brand'
 import { buildNav } from './site/nav'
 import { buildFooter } from './site/footer'
 
 const root = document.getElementById('app')
 if (!root) throw new Error('#app missing')
 
+setTitle('docs')
 root.classList.add('site-shell')
 
 root.appendChild(buildNav('docs'))
@@ -19,19 +21,19 @@ const DOCS: { title: string; blurb: string; href: string }[] = [
     title: 'architecture',
     blurb:
       'Every route, every primitive. Asset path traced step-by-step. Lobby path traced step-by-step. Local-vs-prod table. Concurrency model. Why D1 and not KV for saves.',
-    href: 'https://github.com/acoyfellow/vibe-cdn/blob/main/docs/architecture.md',
+    href: `${brand.repo}/blob/main/docs/architecture.md`,
   },
   {
     title: 'costs',
     blurb:
       'The four meters that actually bill (R2 storage, class A/B ops, Worker requests, DO duration). Three concrete scenarios at 1k, 50k, and 5M players with line-item totals. Rules of thumb. When to call Cloudflare.',
-    href: 'https://github.com/acoyfellow/vibe-cdn/blob/main/docs/costs.md',
+    href: `${brand.repo}/blob/main/docs/costs.md`,
   },
   {
     title: 'deploy',
     blurb:
       "Bootstrap the bindings (R2, D1, KV, DO), wire wrangler.jsonc, disable the dev upload route, ship. Custom domain notes. Uploading assets to R2 with content-addressed keys.",
-    href: 'https://github.com/acoyfellow/vibe-cdn/blob/main/docs/deploy.md',
+    href: `${brand.repo}/blob/main/docs/deploy.md`,
   },
 ]
 

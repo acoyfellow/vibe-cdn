@@ -4,12 +4,14 @@ import './style.css'
 import './site/site.css'
 import './install.css'
 import { el } from './dom'
+import { brand, setTitle } from './brand'
 import { buildNav } from './site/nav'
 import { buildFooter } from './site/footer'
 
 const root = document.getElementById('app')
 if (!root) throw new Error('#app missing')
 
+setTitle('install')
 root.classList.add('site-shell')
 
 root.appendChild(buildNav('install'))
@@ -20,7 +22,7 @@ const main = el('main', {
     el('header', {
       class: 'install-hero',
       children: [
-        el('p', { class: 'home-eyebrow', text: 'install vibe-cdn' }),
+        el('p', { class: 'home-eyebrow', text: `install ${brand.name}` }),
         el('h1', {
           class: 'install-headline',
           text: 'Pick the path that matches your patience.',
@@ -40,7 +42,7 @@ const main = el('main', {
         "Cloudflare provisions R2, D1, KV, Workers, and points the worker at your account. Forty seconds, no terminal. You get a workers.dev URL you can put anywhere.",
       action: {
         label: 'deploy to Cloudflare',
-        href: 'https://deploy.workers.cloudflare.com/?url=https://github.com/acoyfellow/vibe-cdn',
+        href: `https://deploy.workers.cloudflare.com/?url=${brand.repo}`,
         primary: true,
       },
     }),
@@ -50,7 +52,7 @@ const main = el('main', {
       title: 'fork into a new repo',
       blurb:
         "Scaffold a fresh copy under your own name. Same code, your repo. Good when you're committing to building on it.",
-      code: 'npx tiged acoyfellow/vibe-cdn my-game-cdn\ncd my-game-cdn\nbun install\nbun run demo',
+      code: `npx tiged ${brand.repoSlug} my-game\ncd my-game\nbun install\nbun run demo`,
     }),
 
     optionCard({
@@ -60,7 +62,7 @@ const main = el('main', {
         "Run the local demo entirely in the browser. No clone, no install. Best when you just want to see the stack respond to your code.",
       action: {
         label: 'open in StackBlitz',
-        href: 'https://stackblitz.com/github/acoyfellow/vibe-cdn',
+        href: `https://stackblitz.com/github/${brand.repoSlug}`,
       },
     }),
 

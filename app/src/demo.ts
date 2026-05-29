@@ -3,6 +3,7 @@
 import './style.css'
 import './site/site.css'
 import { el } from './dom'
+import { setTitle } from './brand'
 import { buildHero } from './hero'
 import { buildNav } from './site/nav'
 import { buildFooter } from './site/footer'
@@ -17,6 +18,7 @@ import { costPanel } from './panels/cost'
 const root = document.getElementById('app')
 if (!root) throw new Error('#app missing')
 
+setTitle('demo')
 root.classList.add('site-shell')
 
 root.appendChild(buildNav('demo'))

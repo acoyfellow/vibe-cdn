@@ -3,6 +3,7 @@
 // Usage:  appendNav(rootEl, 'home' | 'demo' | 'docs' | 'install')
 
 import { el } from '../dom'
+import { brand } from '../brand'
 
 type ActivePage = 'home' | 'demo' | 'docs' | 'install'
 
@@ -19,8 +20,8 @@ export function buildNav(active?: ActivePage): HTMLElement {
         class: 'site-nav-brand',
         attrs: { href: '/' },
         children: [
-          el('span', { class: 'site-nav-mark', text: 'v' }),
-          el('span', { class: 'site-nav-wordmark', text: 'vibe-cdn' }),
+          el('span', { class: 'site-nav-mark', text: brand.mark }),
+          el('span', { class: 'site-nav-wordmark', text: brand.wordmark }),
         ],
       }),
       el('nav', {
@@ -35,7 +36,7 @@ export function buildNav(active?: ActivePage): HTMLElement {
           ),
           el('a', {
             class: 'site-nav-link site-nav-github',
-            attrs: { href: 'https://github.com/acoyfellow/vibe-cdn', target: '_blank', rel: 'noreferrer' },
+            attrs: { href: brand.repo, target: '_blank', rel: 'noreferrer' },
             text: 'github',
           }),
           el('a', {

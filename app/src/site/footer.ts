@@ -1,6 +1,7 @@
 // Shared site footer. Appears at the bottom of every page.
 
 import { el } from '../dom'
+import { brand } from '../brand'
 
 const LINK_GROUPS: { heading: string; items: { label: string; href: string }[] }[] = [
   {
@@ -14,17 +15,17 @@ const LINK_GROUPS: { heading: string; items: { label: string; href: string }[] }
   {
     heading: 'docs',
     items: [
-      { label: 'architecture', href: 'https://github.com/acoyfellow/vibe-cdn/blob/main/docs/architecture.md' },
-      { label: 'costs', href: 'https://github.com/acoyfellow/vibe-cdn/blob/main/docs/costs.md' },
-      { label: 'deploy', href: 'https://github.com/acoyfellow/vibe-cdn/blob/main/docs/deploy.md' },
+      { label: 'architecture', href: `${brand.repo}/blob/main/docs/architecture.md` },
+      { label: 'costs', href: `${brand.repo}/blob/main/docs/costs.md` },
+      { label: 'deploy', href: `${brand.repo}/blob/main/docs/deploy.md` },
     ],
   },
   {
     heading: 'source',
     items: [
-      { label: 'github', href: 'https://github.com/acoyfellow/vibe-cdn' },
-      { label: 'license', href: 'https://github.com/acoyfellow/vibe-cdn/blob/main/LICENSE' },
-      { label: 'author', href: 'https://x.com/acoyfellow' },
+      { label: 'github', href: brand.repo },
+      { label: 'license', href: `${brand.repo}/blob/main/LICENSE` },
+      { label: 'author', href: brand.author },
     ],
   },
 ]
@@ -63,7 +64,7 @@ export function buildFooter(): HTMLElement {
       el('div', {
         class: 'site-foot-bar',
         children: [
-          el('span', { class: 'site-foot-meta', text: 'made on Cloudflare · MIT · 0.1.0' }),
+          el('span', { class: 'site-foot-meta', text: `made on Cloudflare · MIT · ${brand.version}` }),
           el('span', { class: 'site-foot-egress', text: 'egress: $0' }),
         ],
       }),

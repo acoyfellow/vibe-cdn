@@ -9,6 +9,7 @@
 import './style.css'
 import './embed.css'
 import { el } from './dom'
+import { brand } from './brand'
 import { racePanel } from './panels/race'
 
 const root = document.getElementById('app')
@@ -22,10 +23,10 @@ const wrapper = el('div', {
     racePanel(),
     el('a', {
       class: 'embed-attr',
-      attrs: { href: 'https://vibe-cdn.coey.dev', target: '_blank', rel: 'noreferrer' },
+      attrs: { href: brand.url, target: '_blank', rel: 'noreferrer' },
       children: [
-        el('span', { class: 'embed-attr-mark', text: 'v' }),
-        el('span', { class: 'embed-attr-text', text: 'vibe-cdn' }),
+        el('span', { class: 'embed-attr-mark', text: brand.mark }),
+        el('span', { class: 'embed-attr-text', text: brand.wordmark }),
       ],
     }),
   ],
