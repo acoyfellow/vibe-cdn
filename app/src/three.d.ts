@@ -113,7 +113,25 @@ declare module 'three' {
   }
 
   export class PlaneGeometry {
-    constructor(w?: number, h?: number)
+    constructor(w?: number, h?: number, widthSegments?: number, heightSegments?: number)
+    attributes: {
+      position: {
+        count: number
+        getX(i: number): number
+        getY(i: number): number
+        setZ(i: number, z: number): void
+        needsUpdate: boolean
+      }
+    }
+    computeVertexNormals(): void
+  }
+
+  export class ConeGeometry {
+    constructor(radius?: number, height?: number, radialSegments?: number)
+  }
+
+  export class SphereGeometry {
+    constructor(radius?: number, widthSegments?: number, heightSegments?: number)
   }
 
   export class BufferGeometry {
@@ -158,7 +176,7 @@ declare module 'three' {
   }
 
   export class MeshBasicMaterial {
-    constructor(params?: { color?: number | string; wireframe?: boolean; side?: number })
+    constructor(params?: { color?: number | string; wireframe?: boolean; side?: number; transparent?: boolean; opacity?: number })
   }
 
   export const DoubleSide: number

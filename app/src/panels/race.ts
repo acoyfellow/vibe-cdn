@@ -19,18 +19,17 @@ import type {
   LobbyServerMessage,
 } from '../../../src/shared/contracts'
 import { bigButton, el, logLine, makeStatus, panel, setStatus } from '../dom'
+import { playgroundConfig } from '../playground/config'
+import { createTerrain } from '../playground/terrain'
+import { createObjects, collideObjects, resetObjects, updateObjects } from '../playground/objects'
+import { ShootingSystem } from '../playground/shooting'
 
 const CAR_ASSET = '/cdn/demo/car.glb'
 const LOBBY_PATH = '/ws/lobby/arena'
 const SEND_HZ = 20
 const SEND_MS = 1000 / SEND_HZ
 const INTERP_DELAY_MS = 150
-const MAX_SPEED = 30
-const ACCEL = 16
-const REVERSE_ACCEL = 10
-const TURN_RATE = 2.2
-const DRAG = 0.9
-const ARENA_HALF = 120          // half-width of the arena floor in meters
+const ARENA_HALF = playgroundConfig.terrain.arenaHalf
 const TOP_SPEED_POST_THRESHOLD = 2 // only post when top speed improves by 2 mph
 
 export function racePanel(): HTMLElement {
@@ -42,17 +41,37 @@ export function racePanel(): HTMLElement {
   const hudSpeed = el('span', { class: 'hud-val mono', text: '0' })
   const hudTopSpeed = el('span', { class: 'hud-val mono', text: '0' })
   const hudPlayers = el('span', { class: 'hud-val mono', text: '0' })
+  const hudShots = el('span', { class: 'hud-val mono', text: '0' })
   const hudPing = el('span', { class: 'hud-val mono', text: '— ms' })
   const hud = el('div', {
     class: 'race-hud',
     children: [
       hudCell('speed', hudSpeed, 'mph-ish'),
       hudCell('top speed', hudTopSpeed, 'this session'),
+      hudCell('shots', hudShots, 'live'),
       hudCell('players', hudPlayers, 'online'),
       hudCell('ping', hudPing, ''),
     ],
   })
   stage.appendChild(hud)
+
+  // Mobile-first controls. The game cannot require a keyboard when kids are
+  // opening it from a phone. The left thumb is an analog drive stick; the
+  // right thumb gets fire/reset. These feed the same state as WASD/Space.
+  const joystick = { x: 0, y: 0, active: false, pointerId: -1 }
+  const joystickThumb = el('div', { class: 'joystick-thumb' })
+  const joystickBase = el('div', {
+    class: 'joystick-base',
+    attrs: { role: 'application', 'aria-label': 'drive joystick' },
+    children: [joystickThumb],
+  })
+  const touchFire = el('button', { class: 'touch-action touch-fire', text: 'FIRE', attrs: { type: 'button', 'aria-label': 'fire' } })
+  const touchReset = el('button', { class: 'touch-action touch-reset', text: 'RESET', attrs: { type: 'button', 'aria-label': 'reset car' } })
+  const touchControls = el('div', {
+    class: 'touch-controls',
+    children: [joystickBase, el('div', { class: 'touch-actions', children: [touchFire, touchReset] })],
+  })
+  stage.appendChild(touchControls)
 
   const nameInput = el('input', {
     class: 'text-input',
@@ -86,11 +105,15 @@ export function racePanel(): HTMLElement {
   fill.position.set(-40, 60, -30)
   scene.add(fill as unknown as object)
 
-  // The arena floor — a large flat plane with a procedural grid texture.
-  scene.add(buildArenaFloor() as unknown as object)
+  // Playground systems are config-first: a future overlay only mutates this data.
+  const terrain = createTerrain(playgroundConfig)
+  scene.add(terrain.mesh)
+  const arenaObjects = createObjects(playgroundConfig, terrain)
+  for (const object of arenaObjects) scene.add(object.mesh)
+  const shooting = new ShootingSystem(scene, playgroundConfig, terrain)
 
   // A subtle origin marker so the arena has a visual anchor.
-  scene.add(buildOriginMarker() as unknown as object)
+  scene.add(buildOriginMarker(terrain.heightAt(0, 0)) as unknown as object)
 
   // The player's car (filled in after GLB loads).
   const carGroup = new THREE.Group()
@@ -103,8 +126,10 @@ export function racePanel(): HTMLElement {
   let carTemplate: THREE.Object3D | null = null
 
   // ── State ─────────────────────────────────────────────────────────────
-  const keys = { w: false, a: false, s: false, d: false }
+  const keys = { w: false, a: false, s: false, d: false, fire: false }
   let speed = 0
+  let verticalVelocity = 0
+  let airborne = false
   let topSpeed = 0
   let lastPostedTopSpeed = 0
   let myId: string | null = null
@@ -149,6 +174,9 @@ export function racePanel(): HTMLElement {
         const playerCar = (root as unknown as { clone: (deep?: boolean) => THREE.Object3D }).clone(true)
         playerCar.rotation.y = Math.PI
         carGroup.add(playerCar)
+        // Sit the car on the displaced terrain at spawn. Without this it
+        // starts beneath a hill until the first time the player drives.
+        carGroup.position.y = terrain.heightAt(carGroup.position.x, carGroup.position.z) + 0.08
 
         // Snap the camera so the first frame is a flattering chase shot.
         camTmp.copy(camOffset).applyQuaternion(carGroup.quaternion)
@@ -160,7 +188,7 @@ export function racePanel(): HTMLElement {
 
         const ms = Math.round(performance.now() - t0)
         logLine(log, `loaded ${CAR_ASSET} in ${ms} ms`, 'ok')
-        setStatus(status, 'ok', 'ready — WASD to drive')
+        setStatus(status, 'ok', 'ready — drive')
         idleStartedAt = performance.now()
         connect()
       },
@@ -289,6 +317,7 @@ export function racePanel(): HTMLElement {
     else if (e.code === 'KeyS' || e.code === 'ArrowDown') keys.s = true
     else if (e.code === 'KeyA' || e.code === 'ArrowLeft') keys.a = true
     else if (e.code === 'KeyD' || e.code === 'ArrowRight') keys.d = true
+    else if (e.code === 'Space') keys.fire = true
     else return
     e.preventDefault()
   }
@@ -297,6 +326,7 @@ export function racePanel(): HTMLElement {
     else if (e.code === 'KeyS' || e.code === 'ArrowDown') keys.s = false
     else if (e.code === 'KeyA' || e.code === 'ArrowLeft') keys.a = false
     else if (e.code === 'KeyD' || e.code === 'ArrowRight') keys.d = false
+    else if (e.code === 'Space') keys.fire = false
   }
   window.addEventListener('keydown', onKeyDown, { passive: false })
   window.addEventListener('keyup', onKeyUp)
@@ -307,6 +337,19 @@ export function racePanel(): HTMLElement {
     lastFrameAt = now
     updateCar(dt)
     clampToArena()
+    updateObjects(arenaObjects, dt)
+    const collision = collideObjects(arenaObjects, carGroup, speed, playgroundConfig.physics.collisionBounce)
+    speed = collision.speed
+    if (collision.ramp && !airborne && Math.abs(speed) > 8) {
+      airborne = true
+      verticalVelocity = playgroundConfig.physics.rampLaunchVelocity
+      logLine(log, 'launched off ramp', 'ok')
+    }
+    if (collision.crashed) logLine(log, `crashed into ${collision.crashed.kind}`, 'info')
+    if (keys.fire && shooting.fire(carGroup, now)) hudShots.textContent = String(shooting.shots.length)
+    const hit = shooting.update(now, dt, arenaObjects)
+    if (hit) logLine(log, `hit ${hit.kind}`, 'ok')
+    hudShots.textContent = String(shooting.shots.length)
     trackTopSpeed()
     updateCamera()
     interpolateGhosts(now)
@@ -316,7 +359,9 @@ export function racePanel(): HTMLElement {
   }
 
   const updateCar = (dt: number) => {
-    const anyKey = keys.w || keys.a || keys.s || keys.d
+    const touchThrottle = joystick.active ? -joystick.y : 0
+    const touchSteer = joystick.active ? -joystick.x : 0
+    const anyKey = keys.w || keys.a || keys.s || keys.d || Math.abs(touchThrottle) > 0.08 || Math.abs(touchSteer) > 0.08
     if (anyKey && !userHasDriven) userHasDriven = true
     if (!userHasDriven) {
       // Parked. The car does NOT move on its own — driving yourself off into
@@ -327,19 +372,33 @@ export function racePanel(): HTMLElement {
       hudSpeed.textContent = '0'
       return
     }
-    if (keys.w) speed += ACCEL * dt
-    if (keys.s) speed -= REVERSE_ACCEL * dt
-    const drag = (keys.w || keys.s) ? DRAG * 0.2 : DRAG
+    const physics = playgroundConfig.physics
+    const throttle = (keys.w ? 1 : 0) - (keys.s ? 1 : 0) + touchThrottle
+    if (throttle > 0) speed += physics.acceleration * Math.min(1, throttle) * dt
+    if (throttle < 0) speed += physics.reverseAcceleration * Math.max(-1, throttle) * dt
+    const drag = Math.abs(throttle) > 0.04 ? physics.drag * 0.2 : physics.drag
     if (Math.abs(speed) > 0.01) speed -= Math.sign(speed) * drag * dt * Math.abs(speed)
-    speed = Math.max(-MAX_SPEED * 0.5, Math.min(MAX_SPEED, speed))
+    speed = Math.max(-physics.maxSpeed * 0.5, Math.min(physics.maxSpeed, speed))
 
-    const steer = (keys.a ? 1 : 0) - (keys.d ? 1 : 0)
+    const steer = (keys.a ? 1 : 0) - (keys.d ? 1 : 0) + touchSteer
     if (Math.abs(speed) > 0.05) {
-      carGroup.rotation.y += steer * TURN_RATE * dt * (speed / MAX_SPEED)
+      carGroup.rotation.y += Math.max(-1, Math.min(1, steer)) * physics.turnRate * dt * (speed / physics.maxSpeed)
     }
     carForward.set(Math.sin(carGroup.rotation.y), 0, Math.cos(carGroup.rotation.y))
     carGroup.position.x += carForward.x * speed * dt
     carGroup.position.z += carForward.z * speed * dt
+    const groundY = terrain.heightAt(carGroup.position.x, carGroup.position.z) + 0.08
+    if (airborne) {
+      verticalVelocity -= physics.gravity * dt
+      carGroup.position.y += verticalVelocity * dt
+      if (carGroup.position.y <= groundY) {
+        carGroup.position.y = groundY
+        verticalVelocity = 0
+        airborne = false
+      }
+    } else {
+      carGroup.position.y = groundY
+    }
 
     hudSpeed.textContent = String(Math.round(Math.abs(speed) * 2.2))
   }
@@ -447,20 +506,81 @@ export function racePanel(): HTMLElement {
     camera.updateProjectionMatrix()
   }
 
+  const fireProjectile = () => {
+    if (shooting.fire(carGroup, performance.now())) {
+      hudShots.textContent = String(shooting.shots.length)
+      logLine(log, 'fired projectile', 'ok')
+    }
+  }
+
+  const resetCar = () => {
+    speed = 0
+    verticalVelocity = 0
+    airborne = false
+    userHasDriven = false
+    topSpeed = 0
+    lastPostedTopSpeed = 0
+    hudTopSpeed.textContent = '0'
+    carGroup.position.set(0, terrain.heightAt(0, 0) + 0.08, 0)
+    carGroup.rotation.y = 0
+    shooting.reset()
+    resetObjects(arenaObjects)
+    hudShots.textContent = '0'
+    idleStartedAt = performance.now()
+  }
+
+  // Thumb-stick pointer math: dead zone in the middle, then normalized analog
+  // x/y to [-1, 1]. Pointer capture keeps steering if the thumb leaves the pad.
+  const releaseJoystick = () => {
+    joystick.x = 0
+    joystick.y = 0
+    joystick.active = false
+    joystick.pointerId = -1
+    joystickThumb.style.transform = 'translate(0px, 0px)'
+  }
+  const moveJoystick = (e: PointerEvent) => {
+    const rect = joystickBase.getBoundingClientRect()
+    const cx = rect.left + rect.width / 2
+    const cy = rect.top + rect.height / 2
+    const max = rect.width * 0.34
+    let dx = e.clientX - cx
+    let dy = e.clientY - cy
+    const len = Math.hypot(dx, dy)
+    if (len > max) {
+      dx = (dx / len) * max
+      dy = (dy / len) * max
+    }
+    const dead = 0.1
+    joystick.x = Math.abs(dx / max) < dead ? 0 : dx / max
+    joystick.y = Math.abs(dy / max) < dead ? 0 : dy / max
+    joystickThumb.style.transform = `translate(${dx}px, ${dy}px)`
+  }
+  joystickBase.addEventListener('pointerdown', (e) => {
+    e.preventDefault()
+    joystick.active = true
+    joystick.pointerId = e.pointerId
+    joystickBase.setPointerCapture(e.pointerId)
+    stage.focus()
+    moveJoystick(e)
+  })
+  joystickBase.addEventListener('pointermove', (e) => {
+    if (joystick.active && e.pointerId === joystick.pointerId) moveJoystick(e)
+  })
+  joystickBase.addEventListener('pointerup', releaseJoystick)
+  joystickBase.addEventListener('pointercancel', releaseJoystick)
+  touchFire.addEventListener('click', (e) => {
+    e.preventDefault()
+    stage.focus()
+    fireProjectile()
+  })
+  touchReset.addEventListener('click', resetCar)
+
   const controlsRow = el('div', {
-    class: 'row',
+    class: 'row desktop-control-row',
     children: [
       el('label', { class: 'field', children: [el('span', { text: 'name' }), nameInput] }),
-      bigButton('Reset', () => {
-        speed = 0
-        userHasDriven = false
-        topSpeed = 0
-        lastPostedTopSpeed = 0
-        hudTopSpeed.textContent = '0'
-        carGroup.position.set(0, 0, 0)
-        carGroup.rotation.y = 0
-        idleStartedAt = performance.now()
-      }),
+      bigButton('Fire', fireProjectile),
+      bigButton('Reset', resetCar),
       status,
     ],
   })
@@ -472,8 +592,8 @@ export function racePanel(): HTMLElement {
       el('p', {
         class: 'help race-help',
         html:
-          '<strong>click the stage, then WASD or arrows to drive.</strong> ' +
-          'Open a second tab and you appear as a ghost car — every visitor on this URL shares the arena.',
+          '<strong>Drive with the thumb stick or WASD. Fire with the button or Space.</strong> ' +
+          'Climb hills, hit ramps, knock cones over, blast barriers. Open a second tab and you appear as a ghost car — every visitor on this URL shares the arena.',
       }),
       controlsRow,
       log,
@@ -506,7 +626,7 @@ export function racePanel(): HTMLElement {
 
   return panel(
     '2. Mini Arena (multiplayer, free roam)',
-    'The Ferrari from R2, on an open arena floor, with WASD controls. Every visitor in this URL shares the arena and sees the other visitors as ghost cars, synced through a Durable Object at 20 Hz with snapshot interpolation. Top speed achieved goes to the leaderboard.',
+    'The Ferrari from R2 in a configurable playground: rolling terrain, cones, barriers, ramps, and local projectiles. Drive with WASD, shoot with Space. Every visitor shares the arena through a Durable Object at 20 Hz; top speed goes to the leaderboard.',
     body,
   )
 }
@@ -576,7 +696,7 @@ function buildArenaFloor(): THREE.Mesh {
   return mesh
 }
 
-function buildOriginMarker(): THREE.Mesh {
+function buildOriginMarker(groundY = 0): THREE.Mesh {
   // A small, low cylinder at the origin. The visual anchor of the arena
   // without being in the way of drivers.
   const geom = new THREE.PlaneGeometry(4, 4)
@@ -602,7 +722,7 @@ function buildOriginMarker(): THREE.Mesh {
   ;(mat as unknown as { transparent: boolean }).transparent = true
   const mesh = new THREE.Mesh(geom, mat)
   mesh.rotation.x = -Math.PI / 2
-  mesh.position.y = 0.02
+  mesh.position.y = groundY + 0.02
   return mesh
 }
 

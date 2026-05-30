@@ -799,6 +799,111 @@ code, .mono {
   color: rgba(255, 255, 255, 0.45);
 }
 
+/* ── Mobile game controls ─────────────────────────────────────────────── */
+
+.touch-controls {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  display: none;
+}
+
+.joystick-base {
+  position: absolute;
+  left: 18px;
+  bottom: 18px;
+  width: 116px;
+  height: 116px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.65);
+  background: rgba(0, 0, 0, 0.3);
+  pointer-events: auto;
+  touch-action: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.joystick-thumb {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: var(--cf-orange);
+  border: 2px solid rgba(255, 255, 255, 0.92);
+  transition: transform 35ms linear;
+}
+
+.touch-actions {
+  position: absolute;
+  right: 18px;
+  bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 12px;
+  pointer-events: none;
+}
+
+.touch-action {
+  pointer-events: auto;
+  touch-action: manipulation;
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  border-radius: 999px;
+  color: #fff;
+  font-family: var(--font-primary);
+  font-weight: 700;
+  letter-spacing: 0.07em;
+}
+
+.touch-fire {
+  width: 82px;
+  height: 82px;
+  background: var(--cf-orange);
+  font-size: 13px;
+}
+
+.touch-fire:active {
+  background: var(--cf-orange-hover);
+  transform: scale(0.96);
+}
+
+.touch-reset {
+  padding: 8px 16px;
+  background: rgba(0, 0, 0, 0.38);
+  font-size: 11px;
+}
+
+@media (pointer: coarse), (max-width: 720px) {
+  .touch-controls {
+    display: block;
+  }
+
+  .race-stage {
+    min-height: 360px;
+    aspect-ratio: auto;
+  }
+
+  .race-hud {
+    gap: 6px;
+    left: 8px;
+    top: 8px;
+  }
+
+  .hud-cell {
+    min-width: 50px;
+    padding: 4px 6px;
+  }
+
+  .hud-val {
+    font-size: 16px;
+  }
+
+  .desktop-control-row .big-btn {
+    display: none;
+  }
+}
+
 /* ── Range stress table ───────────────────────────────────────────────── */
 
 /* ── Range cache visualization bar ────────────────────────────────────── */
