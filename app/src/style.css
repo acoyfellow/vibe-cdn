@@ -21,6 +21,11 @@
   --hairline-soft: #f4f4f4;
   --line-strong:   #d4d4d4;
 
+  /* Layout rules: one horizontal-divider system across every page. */
+  --rule-color:    #e6e6e6; /* matches the quiet footer divider */
+  --rule:          1px solid var(--rule-color);
+  --rule-gap:      32px;
+
   /* Cloudflare orange. The brand. Primary CTAs, active states, accents. */
   --cf-orange:        #ff5e1f;  /* cloudflare.com primary button */
   --cf-orange-soft:   #ff7038;  /* secondary / hover-light */
@@ -72,6 +77,7 @@
 
 html, body {
   margin: 0;
+  overflow-x: clip;
   background: var(--canvas);
   color: var(--text-primary);
   font-family: var(--font-primary);
@@ -110,7 +116,7 @@ code, .mono {
   align-items: baseline;
   gap: var(--space-2);
   padding: var(--space-2) 0 var(--space-4);
-  border-bottom: 1px solid var(--hairline);
+  border-bottom: var(--rule);
   margin-bottom: var(--space-6);
   font-size: var(--text-xs);
   color: var(--text-muted);
@@ -372,9 +378,23 @@ code, .mono {
 }
 
 .receipts-lead {
-  margin: var(--space-8) 0 0;
-  padding-top: var(--space-6);
-  border-top: 1px solid var(--ink);
+  position: relative;
+  margin: var(--rule-gap) 0 0;
+  padding-top: var(--rule-gap);
+}
+
+.receipts-lead::before,
+.panel::before,
+.closer::before,
+.app-foot::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 100vw;
+  border-top: var(--rule);
+  transform: translateX(-50%);
+  pointer-events: none;
 }
 
 .receipts-h {
@@ -464,12 +484,20 @@ code, .mono {
 }
 
 .panel {
-  padding: var(--space-8) 0;
-  border-top: 1px solid var(--ink);
+  position: relative;
+  padding: var(--rule-gap) 0;
 }
 
-.panel:last-child {
-  border-bottom: 1px solid var(--ink);
+.panel:last-child::after,
+.closer::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  width: 100vw;
+  border-bottom: var(--rule);
+  transform: translateX(-50%);
+  pointer-events: none;
 }
 
 .panel-head h2 {
@@ -973,10 +1001,9 @@ code, .mono {
 /* ── Footer ───────────────────────────────────────────────────────────── */
 
 .closer {
-  margin: var(--space-8) 0 0;
-  padding: var(--space-8) 0;
-  border-top: 1px solid var(--ink);
-  border-bottom: 1px solid var(--ink);
+  position: relative;
+  margin: var(--rule-gap) 0 0;
+  padding: var(--rule-gap) 0;
   text-align: left;
 }
 
@@ -1020,8 +1047,9 @@ code, .mono {
 }
 
 .app-foot {
-  margin-top: var(--space-6);
-  padding-top: var(--space-6);
+  position: relative;
+  margin-top: var(--rule-gap);
+  padding-top: var(--rule-gap);
   color: var(--text-muted);
   font-size: var(--text-sm);
 }
