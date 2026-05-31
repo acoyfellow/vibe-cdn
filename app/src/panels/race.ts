@@ -28,7 +28,11 @@ const CAR_ASSET = '/cdn/demo/car.glb'
 const LOBBY_PATH = '/ws/lobby/arena'
 const SEND_HZ = 20
 const SEND_MS = 1000 / SEND_HZ
-const INTERP_DELAY_MS = 150
+// Remote ghost cars buffer one clean 20 Hz tick (50ms), then expand only
+// when measured packet-arrival jitter requires it. The old fixed 150ms
+// buffer added avoidable visible latency even on clean connections.
+const MIN_INTERP_MS = SEND_MS
+const MAX_INTERP_MS = 130
 const ARENA_HALF = playgroundConfig.terrain.arenaHalf
 const TOP_SPEED_POST_THRESHOLD = 2 // only post when top speed improves by 2 mph
 
@@ -42,7 +46,8 @@ export function racePanel(): HTMLElement {
   const hudTopSpeed = el('span', { class: 'hud-val mono', text: '0' })
   const hudPlayers = el('span', { class: 'hud-val mono', text: '0' })
   const hudShots = el('span', { class: 'hud-val mono', text: '0' })
-  const hudPing = el('span', { class: 'hud-val mono', text: '— ms' })
+  const hudRtt = el('span', { class: 'hud-val mono', text: '—' })
+  const hudBuffer = el('span', { class: 'hud-val mono', text: String(MIN_INTERP_MS) })
   const hud = el('div', {
     class: 'race-hud',
     children: [
@@ -50,7 +55,8 @@ export function racePanel(): HTMLElement {
       hudCell('top speed', hudTopSpeed, 'this session'),
       hudCell('shots', hudShots, 'live'),
       hudCell('players', hudPlayers, 'online'),
-      hudCell('ping', hudPing, ''),
+      hudCell('RTT', hudRtt, 'ms'),
+      hudCell('smooth', hudBuffer, 'ms'),
     ],
   })
   stage.appendChild(hud)
@@ -136,7 +142,10 @@ export function racePanel(): HTMLElement {
   let socket: WebSocket | null = null
   let seq = 0
   let lastSentAt = 0
-  let lastPing = NaN
+  let rttEma = NaN
+  let jitterEma = 0
+  let lastStateArrival = 0
+  let interpolationDelayMs = MIN_INTERP_MS
   let pingTimer: number | null = null
   let raf = 0
   let lastFrameAt = performance.now()
@@ -234,12 +243,15 @@ export function racePanel(): HTMLElement {
       }
       if (msg.type === 'hello') {
         myId = msg.id
-      } else if (msg.type === 'state' || msg.type === 'snapshot') {
+      } else if (msg.type === 'state') {
+        recordStateArrival(performance.now())
+        ingestPlayers(msg.players)
+      } else if (msg.type === 'snapshot') {
         ingestPlayers(msg.players)
       } else if (msg.type === 'pong') {
         const rtt = Date.now() - msg.t
-        lastPing = rtt
-        hudPing.textContent = `${rtt} ms`
+        rttEma = Number.isNaN(rttEma) ? rtt : rttEma * 0.78 + rtt * 0.22
+        hudRtt.textContent = String(Math.round(rttEma))
       }
     })
 
@@ -297,7 +309,7 @@ export function racePanel(): HTMLElement {
         ghosts.set(p.id, ghost)
       }
       ghost.buffer.push({ t: tNow, x: p.x, y: p.y, z: p.z, ry: p.ry })
-      const cutoff = tNow - INTERP_DELAY_MS * 4
+      const cutoff = tNow - MAX_INTERP_MS * 4
       while (ghost.buffer.length > 2 && (ghost.buffer[1]?.t ?? 0) < cutoff) ghost.buffer.shift()
     }
     for (const [id, ghost] of ghosts) {
@@ -453,8 +465,24 @@ export function racePanel(): HTMLElement {
     camera.lookAt(lookTmp.x, lookTmp.y, lookTmp.z)
   }
 
+  const recordStateArrival = (now: number) => {
+    if (lastStateArrival > 0) {
+      const gap = now - lastStateArrival
+      const deviation = Math.abs(gap - SEND_MS)
+      jitterEma = jitterEma * 0.85 + deviation * 0.15
+      // One normal tick plus jitter headroom. Fast on healthy paths, resilient
+      // if packets clump or drop. RTT is displayed but not added to the buffer.
+      interpolationDelayMs = Math.max(
+        MIN_INTERP_MS,
+        Math.min(MAX_INTERP_MS, Math.round(MIN_INTERP_MS + jitterEma * 2.5)),
+      )
+      hudBuffer.textContent = String(interpolationDelayMs)
+    }
+    lastStateArrival = now
+  }
+
   const interpolateGhosts = (now: number) => {
-    const renderTime = now - INTERP_DELAY_MS
+    const renderTime = now - interpolationDelayMs
     for (const [, ghost] of ghosts) {
       if (ghost.buffer.length === 0) continue
       const yaw = sampleAt(ghost.buffer, renderTime, ghostTmp)
@@ -621,8 +649,6 @@ export function racePanel(): HTMLElement {
     }
   })
   observer.observe(document.body, { childList: true, subtree: true })
-
-  void lastPing
 
   return panel(
     '2. Mini Arena (multiplayer, free roam)',
