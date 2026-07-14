@@ -21,6 +21,7 @@
     "@gltf-transform/core": "^4.2.1",
     "@gltf-transform/extensions": "^4.2.1",
     "@gltf-transform/functions": "^4.2.1",
+    "agents": "^0.17.4",
     "three": "^0.181.2"
   },
   "devDependencies": {
