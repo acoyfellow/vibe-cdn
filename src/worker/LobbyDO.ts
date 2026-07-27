@@ -218,7 +218,12 @@ export class LobbyDO extends Agent<Env> {
       }
     }
     for (const e of this.entities.values()) {
-      if (e.kind !== 'boss' || (e.hp ?? 0) <= 0) continue
+      if (e.kind !== 'boss') continue
+      if (typeof e.hp !== 'number') {
+        e.hp = BOSS_MAX_HP
+        e.maxHp = BOSS_MAX_HP
+      }
+      if (e.hp <= 0) continue
       const d = this.rayHitDistance(x, z, dirX, dirZ, e.x, e.z, bestDist)
       if (d !== null && d < bestDist) {
         bestDist = d

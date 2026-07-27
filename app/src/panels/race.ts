@@ -254,6 +254,7 @@ export function racePanel(): HTMLElement {
 
   // ── State ─────────────────────────────────────────────────────────────
   const keys = { w: false, a: false, s: false, d: false, fire: false }
+  let stageEngaged = false
   let speed = 0
   let verticalVelocity = 0
   let airborne = false
@@ -482,6 +483,35 @@ export function racePanel(): HTMLElement {
     send({ type: 'fire', x: carGroup.position.x, z: carGroup.position.z, ry: carGroup.rotation.y })
   }
 
+  const burstAt = (x: number, z: number, now: number) => {
+    const burst = new THREE.Mesh(
+      new THREE.SphereGeometry(1.4, 10, 10),
+      new THREE.MeshBasicMaterial({ color: 0xffdd33, wireframe: true }),
+    )
+    burst.position.set(x, 1, z)
+    scene.add(burst as unknown as object)
+    tracers.push({ mesh: burst, born: now })
+  }
+
+  const collideShotsWithActors = (now: number) => {
+    const actors: { x: number; z: number; r: number }[] = []
+    for (const [, mesh] of entityMeshes) actors.push({ x: mesh.position.x, z: mesh.position.z, r: 2.2 })
+    for (const [, g] of ghosts) actors.push({ x: g.mesh.position.x, z: g.mesh.position.z, r: 2.0 })
+    if (actors.length === 0) return
+    shooting.shots = shooting.shots.filter((shot) => {
+      const sx = shot.mesh.position.x
+      const sz = shot.mesh.position.z
+      for (const a of actors) {
+        if (Math.hypot(a.x - sx, a.z - sz) <= a.r) {
+          scene.remove(shot.mesh as unknown as object)
+          burstAt(sx, sz, now)
+          return false
+        }
+      }
+      return true
+    })
+  }
+
   const testPlace = (x: number, z: number, ry: number) => {
     userHasDriven = true
     carGroup.position.x = x
@@ -571,7 +601,7 @@ export function racePanel(): HTMLElement {
 
   // ── Input ─────────────────────────────────────────────────────────────
   const onKeyDown = (e: KeyboardEvent) => {
-    if (!stage.matches(':hover') && document.activeElement !== stage) return
+    if (!stageEngaged && !stage.matches(':hover') && document.activeElement !== stage) return
     if (e.code === 'KeyW' || e.code === 'ArrowUp') keys.w = true
     else if (e.code === 'KeyS' || e.code === 'ArrowDown') keys.s = true
     else if (e.code === 'KeyA' || e.code === 'ArrowLeft') keys.a = true
@@ -611,6 +641,7 @@ export function racePanel(): HTMLElement {
     }
     const hit = shooting.update(now, dt, arenaObjects)
     if (hit) logLine(log, `hit ${hit.kind}`, 'ok')
+    collideShotsWithActors(now)
     hudShots.textContent = String(shooting.shots.length)
     trackTopSpeed()
     updateCamera()
@@ -885,7 +916,16 @@ export function racePanel(): HTMLElement {
     resize()
     window.addEventListener('resize', resize)
     stage.setAttribute('tabindex', '0')
-    stage.addEventListener('click', () => stage.focus())
+    stage.addEventListener('click', () => {
+      stage.focus()
+      stageEngaged = true
+    })
+    stage.addEventListener('pointerenter', () => {
+      stageEngaged = true
+    })
+    document.addEventListener('pointerdown', (e) => {
+      if (!stage.contains(e.target as Node)) stageEngaged = false
+    })
     raf = requestAnimationFrame(tick)
     void loadCar()
   })
