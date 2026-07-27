@@ -11,6 +11,7 @@ export default defineConfig({
       input: {
         home: resolve(__dirname, 'app/index.html'),
         demo: resolve(__dirname, 'app/demo.html'),
+        demo2: resolve(__dirname, 'app/demo2.html'),
         install: resolve(__dirname, 'app/install.html'),
         docs: resolve(__dirname, 'app/docs.html'),
         embed: resolve(__dirname, 'app/embed.html'),

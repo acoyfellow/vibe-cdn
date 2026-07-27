@@ -24,6 +24,7 @@ declare module 'three' {
     length(): number
     lengthSq(): number
     applyQuaternion(q: Quaternion): this
+    setScalar(s: number): this
   }
 
   export class Quaternion {
@@ -171,8 +172,19 @@ declare module 'three' {
       color?: number | string
       roughness?: number
       metalness?: number
+      emissive?: number | string
       map?: unknown
     })
+  }
+
+  export class Texture {}
+
+  export class SpriteMaterial {
+    constructor(params?: { map?: unknown; transparent?: boolean })
+  }
+
+  export class Sprite extends Object3D {
+    constructor(material?: SpriteMaterial)
   }
 
   export class MeshBasicMaterial {

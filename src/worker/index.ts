@@ -73,6 +73,7 @@ export default {
     // redirect; we follow it once and rewrap so the user only sees 200.
     const pageMap: Record<string, string> = {
       '/demo': '/demo.html',
+      '/demo2': '/demo2.html',
       '/install': '/install.html',
       '/docs': '/docs.html',
       '/embed': '/embed.html',

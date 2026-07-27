@@ -14,6 +14,7 @@ import * as THREE from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js'
 import type {
+  ArenaEntity,
   LobbyClientMessage,
   LobbyPlayer,
   LobbyServerMessage,
@@ -131,6 +132,113 @@ export function racePanel(): HTMLElement {
   const ghosts = new Map<string, Ghost>()
   let carTemplate: THREE.Object3D | null = null
 
+  const entityMeshes = new Map<string, THREE.Object3D>()
+  const entityLoader = new GLTFLoader()
+  const entityDraco = new DRACOLoader()
+  entityDraco.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.7/')
+  entityLoader.setDRACOLoader(entityDraco)
+  let leaderId: string | null = null
+
+  const bossMaterial = new THREE.MeshStandardMaterial({ color: 0xff2d55, emissive: 0x550011, roughness: 0.4 })
+
+  const makeBossMesh = (): THREE.Object3D => {
+    const group = new THREE.Group()
+    const body = new THREE.Mesh(new THREE.ConeGeometry(1.2, 3, 5), bossMaterial)
+    body.rotation.x = Math.PI / 2
+    body.position.y = 1.2
+    group.add(body)
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.35, 12, 12), new THREE.MeshStandardMaterial({ color: 0xffff00, emissive: 0xffcc00 }))
+    eye.position.set(0, 1.6, 1.1)
+    group.add(eye)
+    return group
+  }
+
+  const makeLabelSprite = (text: string): THREE.Sprite => {
+    const canvas = document.createElement('canvas')
+    canvas.width = 256
+    canvas.height = 64
+    const g = canvas.getContext('2d')!
+    g.fillStyle = 'rgba(0,0,0,0.6)'
+    g.fillRect(0, 0, 256, 64)
+    g.fillStyle = '#ffd23f'
+    g.font = 'bold 34px Open Sans, sans-serif'
+    g.textAlign = 'center'
+    g.textBaseline = 'middle'
+    g.fillText(text.slice(0, 18), 128, 32)
+    const tex = new THREE.CanvasTexture(canvas)
+    const mat = new THREE.SpriteMaterial({ map: tex as unknown as THREE.Texture, transparent: true })
+    const sprite = new THREE.Sprite(mat)
+    sprite.scale.set(6, 1.5, 1)
+    return sprite
+  }
+
+  const spawnEntityMesh = (entity: ArenaEntity) => {
+    if (entity.kind === 'boss') {
+      const mesh = makeBossMesh()
+      if (entity.label) {
+        const label = makeLabelSprite(entity.label)
+        label.position.y = 3.6
+        mesh.add(label)
+      }
+      entityMeshes.set(entity.id, mesh)
+      scene.add(mesh as unknown as object)
+      return
+    }
+    const placeholder = new THREE.Mesh(
+      new THREE.BoxGeometry(2, 1, 3),
+      new THREE.MeshStandardMaterial({ color: 0x3fa7ff, roughness: 0.6 }),
+    )
+    entityMeshes.set(entity.id, placeholder)
+    scene.add(placeholder as unknown as object)
+    if (entity.url) {
+      entityLoader.load(
+        entity.url,
+        (gltf) => {
+          const root = gltf.scene
+          const box = new THREE.Box3().setFromObject(root)
+          const size = box.getSize(new THREE.Vector3())
+          const maxDim = Math.max(size.x, size.y, size.z) || 1
+          const s = (3 / maxDim) * (entity.scale || 1)
+          root.scale.set(s, s, s)
+          const cur = entityMeshes.get(entity.id)
+          if (cur) {
+            root.position.copy(cur.position)
+            root.rotation.y = cur.rotation.y
+            scene.remove(cur as unknown as object)
+          }
+          entityMeshes.set(entity.id, root)
+          scene.add(root as unknown as object)
+        },
+        undefined,
+        () => {},
+      )
+    }
+  }
+
+  const ingestEntities = (entities: ArenaEntity[] | undefined, leader: string | undefined) => {
+    leaderId = leader ?? null
+    const seen = new Set<string>()
+    for (const entity of entities ?? []) {
+      seen.add(entity.id)
+      let mesh = entityMeshes.get(entity.id)
+      if (!mesh) {
+        spawnEntityMesh(entity)
+        mesh = entityMeshes.get(entity.id)
+      }
+      if (mesh) {
+        mesh.position.x = entity.x
+        mesh.position.z = entity.z
+        mesh.rotation.y = entity.ry
+      }
+    }
+    for (const [id, mesh] of entityMeshes) {
+      if (!seen.has(id)) {
+        scene.remove(mesh as unknown as object)
+        entityMeshes.delete(id)
+      }
+    }
+  }
+
   // ── State ─────────────────────────────────────────────────────────────
   const keys = { w: false, a: false, s: false, d: false, fire: false }
   let speed = 0
@@ -246,6 +354,8 @@ export function racePanel(): HTMLElement {
       } else if (msg.type === 'state') {
         recordStateArrival(performance.now())
         ingestPlayers(msg.players)
+        ingestEntities(msg.entities, msg.leaderId)
+        applyLeaderStyle()
       } else if (msg.type === 'snapshot') {
         ingestPlayers(msg.players)
       } else if (msg.type === 'pong') {
@@ -282,12 +392,82 @@ export function racePanel(): HTMLElement {
       scene.remove(g.mesh)
     }
     ghosts.clear()
+    for (const [, mesh] of entityMeshes) scene.remove(mesh as unknown as object)
+    entityMeshes.clear()
     hudPlayers.textContent = '0'
   }
 
   const send = (msg: LobbyClientMessage) => {
     if (socket && socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(msg))
   }
+
+  const applyLeaderStyle = () => {
+    const iAmLeader = leaderId !== null && leaderId === myId
+    carGroup.scale.setScalar(iAmLeader ? 1.35 : 1)
+    carGroup.traverse((obj: unknown) => {
+      const o = obj as { isMesh?: boolean; material?: { emissive?: { setHex(h: number): void } } }
+      if (o.isMesh && o.material && o.material.emissive) {
+        o.material.emissive.setHex(iAmLeader ? 0xffb400 : 0x000000)
+      }
+    })
+  }
+
+  const dropModelIntoArena = (url: string, label?: string) => {
+    const ahead = 6
+    const x = carGroup.position.x + Math.sin(carGroup.rotation.y) * ahead
+    const z = carGroup.position.z + Math.cos(carGroup.rotation.y) * ahead
+    send({ type: 'spawn', kind: 'prop', url, x, z, ry: carGroup.rotation.y, scale: 1, label })
+  }
+
+  const spawnBoss = () => {
+    send({ type: 'spawn', kind: 'boss', x: 0, z: 0, label: 'ROOM BOSS' })
+  }
+
+  ;(stage as unknown as { __arena: unknown }).__arena = { dropModelIntoArena, spawnBoss }
+
+  const uploadAndDrop = async (file: File) => {
+    const name = file.name.toLowerCase()
+    const type = name.endsWith('.glb')
+      ? 'model/gltf-binary'
+      : name.endsWith('.gltf')
+        ? 'model/gltf+json'
+        : file.type
+    setStatus(status, 'busy', `uploading ${file.name}…`)
+    try {
+      const res = await fetch('/api/u', {
+        method: 'POST',
+        headers: { 'content-type': type, 'x-filename': file.name },
+        body: await file.arrayBuffer(),
+      })
+      const out = (await res.json()) as { ok: boolean; url?: string; error?: string }
+      if (!out.ok || !out.url) {
+        setStatus(status, 'fail', out.error || 'upload failed')
+        logLine(log, `upload failed: ${out.error}`, 'fail')
+        return
+      }
+      logLine(log, `uploaded → ${out.url}, dropping into arena`, 'ok')
+      setStatus(status, 'ok', 'dropped into arena')
+      dropModelIntoArena(out.url, file.name.replace(/\.[^.]+$/, ''))
+    } catch (err) {
+      setStatus(status, 'fail', 'upload error')
+      logLine(log, `upload error: ${(err as Error).message}`, 'fail')
+    }
+  }
+
+  const dropHint = el('div', { class: 'arena-drop-hint', text: 'drop a .glb to add it to the arena' })
+  stage.appendChild(dropHint)
+  stage.addEventListener('dragover', (e) => {
+    e.preventDefault()
+    stage.classList.add('arena-dragging')
+  })
+  stage.addEventListener('dragleave', () => stage.classList.remove('arena-dragging'))
+  stage.addEventListener('drop', (e) => {
+    e.preventDefault()
+    stage.classList.remove('arena-dragging')
+    const file = e.dataTransfer?.files?.[0]
+    if (file) void uploadAndDrop(file)
+  })
+  ;(stage as unknown as { __arena: { uploadAndDrop: unknown } }).__arena.uploadAndDrop = uploadAndDrop
 
   const ingestPlayers = (players: LobbyPlayer[]) => {
     const tNow = performance.now()
@@ -609,6 +789,7 @@ export function racePanel(): HTMLElement {
       el('label', { class: 'field', children: [el('span', { text: 'name' }), nameInput] }),
       bigButton('Fire', fireProjectile),
       bigButton('Reset', resetCar),
+      bigButton('Spawn Boss', spawnBoss),
       status,
     ],
   })
