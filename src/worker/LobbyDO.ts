@@ -26,6 +26,13 @@ const TICK_HZ = 20
 const TICK_MS = 1000 / TICK_HZ
 const MAX_ENTITIES = 64
 const ENTITIES_KEY = 'arena:entities'
+const PLAYER_MAX_HP = 100
+const BOSS_MAX_HP = 100
+const SHOT_RANGE = 60
+const SHOT_CONE = 0.35
+const SHOT_DAMAGE = 20
+const BOSS_TOUCH_RANGE = 4
+const BOSS_TOUCH_DAMAGE = 8
 
 type PlayerState = LobbyPlayer & { lastSeq: number }
 
@@ -36,6 +43,7 @@ export class LobbyDO extends Agent<Env> {
   private tickHandle: ReturnType<typeof setInterval> | null = null
   private entities = new Map<string, ArenaEntity>()
   private entitiesLoaded = false
+  private lastBossHit = new Map<string, number>()
 
   private async ensureEntitiesLoaded(): Promise<void> {
     if (this.entitiesLoaded) return
@@ -62,6 +70,8 @@ export class LobbyDO extends Agent<Env> {
       lastLapMs: undefined,
       seenAt: Date.now(),
       lastSeq: -1,
+      hp: PLAYER_MAX_HP,
+      kills: 0,
     }
     connection.setState(player)
 
@@ -128,6 +138,10 @@ export class LobbyDO extends Agent<Env> {
         this.sendTo(connection, { type: 'pong', t: message.t, now: Date.now() })
         return
       }
+      case 'fire': {
+        this.resolveShot(connection, player, finite(message.x), finite(message.z), finite(message.ry))
+        return
+      }
       case 'spawn': {
         void this.spawnEntity({
           kind: message.kind === 'boss' ? 'boss' : 'prop',
@@ -172,10 +186,102 @@ export class LobbyDO extends Agent<Env> {
       label: input.label ? String(input.label).slice(0, 40) : undefined,
       ownerId: input.ownerId,
       createdAt: Date.now(),
+      hp: input.kind === 'boss' ? BOSS_MAX_HP : undefined,
+      maxHp: input.kind === 'boss' ? BOSS_MAX_HP : undefined,
     }
     this.entities.set(id, entity)
     await this.persistEntities()
     this.ensureTickRunning()
+  }
+
+  private resolveShot(
+    shooter: Connection,
+    player: PlayerState,
+    x: number,
+    z: number,
+    ry: number,
+  ): void {
+    const dirX = Math.sin(ry)
+    const dirZ = Math.cos(ry)
+    let hitId: string | undefined
+    let hitKind: 'player' | 'boss' | undefined
+    let bestDist = SHOT_RANGE
+
+    for (const c of this.getConnections<PlayerState>()) {
+      const t = c.state
+      if (!t || t.id === player.id || (t.hp ?? 0) <= 0) continue
+      const d = this.rayHitDistance(x, z, dirX, dirZ, t.x, t.z, bestDist)
+      if (d !== null && d < bestDist) {
+        bestDist = d
+        hitId = t.id
+        hitKind = 'player'
+      }
+    }
+    for (const e of this.entities.values()) {
+      if (e.kind !== 'boss' || (e.hp ?? 0) <= 0) continue
+      const d = this.rayHitDistance(x, z, dirX, dirZ, e.x, e.z, bestDist)
+      if (d !== null && d < bestDist) {
+        bestDist = d
+        hitId = e.id
+        hitKind = 'boss'
+      }
+    }
+
+    const shot: LobbyServerMessage = {
+      type: 'shot',
+      fromId: player.id,
+      x,
+      z,
+      ry,
+      range: hitId ? bestDist : SHOT_RANGE,
+      hitId,
+      hitKind,
+    }
+    this.broadcast(JSON.stringify(shot))
+
+    if (hitKind === 'player' && hitId) {
+      for (const c of this.getConnections<PlayerState>()) {
+        const t = c.state
+        if (!t || t.id !== hitId) continue
+        const hp = (t.hp ?? PLAYER_MAX_HP) - SHOT_DAMAGE
+        if (hp <= 0) {
+          c.setState({ ...t, hp: PLAYER_MAX_HP, x: 0, z: 0, seenAt: Date.now() })
+          shooter.setState({ ...player, kills: (player.kills ?? 0) + 1 })
+        } else {
+          c.setState({ ...t, hp, seenAt: Date.now() })
+        }
+      }
+    } else if (hitKind === 'boss' && hitId) {
+      const boss = this.entities.get(hitId)
+      if (boss) {
+        boss.hp = (boss.hp ?? BOSS_MAX_HP) - SHOT_DAMAGE
+        if (boss.hp <= 0) {
+          this.entities.delete(hitId)
+          shooter.setState({ ...player, kills: (player.kills ?? 0) + 1 })
+        }
+        void this.persistEntities()
+      }
+    }
+  }
+
+  private rayHitDistance(
+    ox: number,
+    oz: number,
+    dx: number,
+    dz: number,
+    tx: number,
+    tz: number,
+    maxDist: number,
+  ): number | null {
+    const relX = tx - ox
+    const relZ = tz - oz
+    const along = relX * dx + relZ * dz
+    if (along <= 0 || along > maxDist) return null
+    const perpX = relX - along * dx
+    const perpZ = relZ - along * dz
+    const perp = Math.hypot(perpX, perpZ)
+    if (perp > SHOT_CONE * along + 1.5) return null
+    return along
   }
 
   onClose(_connection: Connection): void {
@@ -265,8 +371,27 @@ export class LobbyDO extends Agent<Env> {
         boss.ry = Math.atan2(dx, dz)
         changed = true
       }
+      if (len <= BOSS_TOUCH_RANGE) this.bossTouch(boss.id)
     }
     if (changed) void this.persistEntities()
+  }
+
+  private bossTouch(bossId: string): void {
+    const now = Date.now()
+    const last = this.lastBossHit.get(bossId) ?? 0
+    if (now - last < 500) return
+    this.lastBossHit.set(bossId, now)
+    const boss = this.entities.get(bossId)
+    if (!boss) return
+    for (const c of this.getConnections<PlayerState>()) {
+      const t = c.state
+      if (!t || (t.hp ?? 0) <= 0) continue
+      const d = Math.hypot(t.x - boss.x, t.z - boss.z)
+      if (d > BOSS_TOUCH_RANGE) continue
+      const hp = (t.hp ?? PLAYER_MAX_HP) - BOSS_TOUCH_DAMAGE
+      if (hp <= 0) c.setState({ ...t, hp: PLAYER_MAX_HP, x: 0, z: 0, seenAt: now })
+      else c.setState({ ...t, hp, seenAt: now })
+    }
   }
 
   private broadcastSnapshot() {
@@ -290,6 +415,8 @@ function playerView(p: PlayerState): LobbyPlayer {
     lap: p.lap,
     lastLapMs: p.lastLapMs,
     seenAt: p.seenAt,
+    hp: p.hp,
+    kills: p.kills,
   }
 }
 

@@ -47,13 +47,16 @@ export function racePanel(): HTMLElement {
   const hudTopSpeed = el('span', { class: 'hud-val mono', text: '0' })
   const hudPlayers = el('span', { class: 'hud-val mono', text: '0' })
   const hudShots = el('span', { class: 'hud-val mono', text: '0' })
+  const hudHp = el('span', { class: 'hud-val mono', text: '100' })
+  const hudKills = el('span', { class: 'hud-val mono', text: '0' })
   const hudRtt = el('span', { class: 'hud-val mono', text: '—' })
   const hudBuffer = el('span', { class: 'hud-val mono', text: String(MIN_INTERP_MS) })
   const hud = el('div', {
     class: 'race-hud',
     children: [
       hudCell('speed', hudSpeed, 'mph-ish'),
-      hudCell('top speed', hudTopSpeed, 'this session'),
+      hudCell('hp', hudHp, 'health'),
+      hudCell('kills', hudKills, 'frags'),
       hudCell('shots', hudShots, 'live'),
       hudCell('players', hudPlayers, 'online'),
       hudCell('RTT', hudRtt, 'ms'),
@@ -175,11 +178,6 @@ export function racePanel(): HTMLElement {
   const spawnEntityMesh = (entity: ArenaEntity) => {
     if (entity.kind === 'boss') {
       const mesh = makeBossMesh()
-      if (entity.label) {
-        const label = makeLabelSprite(entity.label)
-        label.position.y = 3.6
-        mesh.add(label)
-      }
       entityMeshes.set(entity.id, mesh)
       scene.add(mesh as unknown as object)
       return
@@ -215,6 +213,9 @@ export function racePanel(): HTMLElement {
     }
   }
 
+  const bossHp = new Map<string, number>()
+  const bossLabels = new Map<string, THREE.Object3D>()
+
   const ingestEntities = (entities: ArenaEntity[] | undefined, leader: string | undefined) => {
     leaderId = leader ?? null
     const seen = new Set<string>()
@@ -229,6 +230,18 @@ export function racePanel(): HTMLElement {
         mesh.position.x = entity.x
         mesh.position.z = entity.z
         mesh.rotation.y = entity.ry
+        if (entity.kind === 'boss' && typeof entity.hp === 'number') {
+          const prev = bossHp.get(entity.id)
+          if (prev !== entity.hp) {
+            bossHp.set(entity.id, entity.hp)
+            const old = bossLabels.get(entity.id)
+            if (old) mesh.remove(old as unknown as object)
+            const label = makeLabelSprite(`BOSS  ${Math.max(0, entity.hp)}hp`)
+            label.position.y = 3.6
+            mesh.add(label as unknown as object)
+            bossLabels.set(entity.id, label)
+          }
+        }
       }
     }
     for (const [id, mesh] of entityMeshes) {
@@ -356,6 +369,9 @@ export function racePanel(): HTMLElement {
         ingestPlayers(msg.players)
         ingestEntities(msg.entities, msg.leaderId)
         applyLeaderStyle()
+        applyHud(msg.players)
+      } else if (msg.type === 'shot') {
+        renderShot(msg)
       } else if (msg.type === 'snapshot') {
         ingestPlayers(msg.players)
       } else if (msg.type === 'pong') {
@@ -423,7 +439,58 @@ export function racePanel(): HTMLElement {
     send({ type: 'spawn', kind: 'boss', x: 0, z: 0, label: 'ROOM BOSS' })
   }
 
-  ;(stage as unknown as { __arena: unknown }).__arena = { dropModelIntoArena, spawnBoss }
+  const applyHud = (players: LobbyPlayer[]) => {
+    const me = players.find((p) => p.id === myId)
+    if (!me) return
+    hudHp.textContent = String(Math.max(0, Math.round(me.hp ?? 100)))
+    hudKills.textContent = String(me.kills ?? 0)
+  }
+
+  const tracers: { mesh: THREE.Object3D; born: number }[] = []
+
+  const renderShot = (shot: { fromId: string; x: number; z: number; ry: number; range: number; hitId?: string }) => {
+    const len = shot.range
+    const geom = new THREE.BoxGeometry(0.08, 0.08, len)
+    const mat = new THREE.MeshBasicMaterial({ color: shot.fromId === myId ? 0x66ccff : 0xff5e1f })
+    const beam = new THREE.Mesh(geom, mat)
+    beam.position.set(shot.x + Math.sin(shot.ry) * (len / 2), 1, shot.z + Math.cos(shot.ry) * (len / 2))
+    beam.rotation.y = shot.ry
+    scene.add(beam as unknown as object)
+    tracers.push({ mesh: beam, born: performance.now() })
+    if (shot.hitId) {
+      const hitMesh = shot.hitId === myId ? null : ghosts.get(shot.hitId)?.mesh ?? entityMeshes.get(shot.hitId)
+      const hx = hitMesh ? hitMesh.position.x : shot.x + Math.sin(shot.ry) * len
+      const hz = hitMesh ? hitMesh.position.z : shot.z + Math.cos(shot.ry) * len
+      const burst = new THREE.Mesh(new THREE.SphereGeometry(1.1, 10, 10), new THREE.MeshBasicMaterial({ color: 0xffdd33, wireframe: true }))
+      burst.position.set(hx, 1, hz)
+      scene.add(burst as unknown as object)
+      tracers.push({ mesh: burst, born: performance.now() })
+    }
+  }
+
+  const updateTracers = (now: number) => {
+    for (let i = tracers.length - 1; i >= 0; i--) {
+      const tr = tracers[i]!
+      if (now - tr.born > 140) {
+        scene.remove(tr.mesh as unknown as object)
+        tracers.splice(i, 1)
+      }
+    }
+  }
+
+  const fireNetworked = () => {
+    send({ type: 'fire', x: carGroup.position.x, z: carGroup.position.z, ry: carGroup.rotation.y })
+  }
+
+  const testPlace = (x: number, z: number, ry: number) => {
+    userHasDriven = true
+    carGroup.position.x = x
+    carGroup.position.z = z
+    carGroup.rotation.y = ry
+    seq++
+    send({ type: 'move', x, y: carGroup.position.y, z, ry, seq, t: performance.now() })
+  }
+  ;(stage as unknown as { __arena: unknown }).__arena = { dropModelIntoArena, spawnBoss, fireNetworked, testPlace }
 
   const uploadAndDrop = async (file: File) => {
     const name = file.name.toLowerCase()
@@ -538,12 +605,16 @@ export function racePanel(): HTMLElement {
       logLine(log, 'launched off ramp', 'ok')
     }
     if (collision.crashed) logLine(log, `crashed into ${collision.crashed.kind}`, 'info')
-    if (keys.fire && shooting.fire(carGroup, now)) hudShots.textContent = String(shooting.shots.length)
+    if (keys.fire && shooting.fire(carGroup, now)) {
+      hudShots.textContent = String(shooting.shots.length)
+      fireNetworked()
+    }
     const hit = shooting.update(now, dt, arenaObjects)
     if (hit) logLine(log, `hit ${hit.kind}`, 'ok')
     hudShots.textContent = String(shooting.shots.length)
     trackTopSpeed()
     updateCamera()
+    updateTracers(now)
     interpolateGhosts(now)
     maybeSendMove(now)
     renderer.render(scene, camera)
@@ -718,6 +789,7 @@ export function racePanel(): HTMLElement {
     if (shooting.fire(carGroup, performance.now())) {
       hudShots.textContent = String(shooting.shots.length)
       logLine(log, 'fired projectile', 'ok')
+      fireNetworked()
     }
   }
 
@@ -802,7 +874,7 @@ export function racePanel(): HTMLElement {
         class: 'help race-help',
         html:
           '<strong>Drive with the thumb stick or WASD. Fire with the button or Space.</strong> ' +
-          'Climb hills, hit ramps, knock cones over, blast barriers. Open a second tab and you appear as a ghost car — every visitor on this URL shares the arena.',
+          'Shoot other players and the boss with Space. Hits are server-authoritative: everyone sees the same tracers, damage, and kills. Spawn Boss to add a server-side hunter that chases and damages the nearest player until someone destroys it. Open a second tab and you appear as a ghost car.',
       }),
       controlsRow,
       log,

@@ -50,6 +50,7 @@ export type LobbyClientMessage =
     }
   | { type: 'lap'; lap: number; lastLapMs?: number }
   | { type: 'ping'; t: number }
+  | { type: 'fire'; x: number; z: number; ry: number }
   | {
       type: 'spawn'
       kind: EntityKind
@@ -75,6 +76,8 @@ export type ArenaEntity = {
   label?: string
   ownerId?: string
   createdAt: number
+  hp?: number
+  maxHp?: number
 }
 
 export type LobbyPlayer = {
@@ -87,6 +90,8 @@ export type LobbyPlayer = {
   lap?: number
   lastLapMs?: number
   seenAt: number
+  hp?: number
+  kills?: number
 }
 
 export type LobbyServerMessage =
@@ -103,6 +108,16 @@ export type LobbyServerMessage =
       players: LobbyPlayer[]
       entities?: ArenaEntity[]
       leaderId?: string
+    }
+  | {
+      type: 'shot'
+      fromId: string
+      x: number
+      z: number
+      ry: number
+      range: number
+      hitId?: string
+      hitKind?: 'player' | 'boss'
     }
   | { type: 'pong'; t: number; now: number }
   | { type: 'error'; message: string }
