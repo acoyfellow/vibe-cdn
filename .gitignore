@@ -11,3 +11,4 @@ fixtures/generated
 fixtures/generated/
 fixtures/optimized/
 node_modules
+.loop/
