@@ -8,7 +8,7 @@
     "directory": "./app/dist",
     "binding": "APP_ASSETS",
     "not_found_handling": "single-page-application",
-    "run_worker_first": ["/embed", "/embed/*", "/demo", "/install", "/docs", "/health", "/manifest.json", "/cdn/*", "/__dev/*", "/api/*", "/u/*", "/ws/*"]
+    "run_worker_first": ["/embed", "/embed/*", "/demo", "/demo2", "/install", "/docs", "/health", "/manifest.json", "/cdn/*", "/__dev/*", "/api/*", "/u/*", "/ws/*"]
   },
   "vars": {
     "ENVIRONMENT": "local",
@@ -59,6 +59,7 @@
     "production": {
       "name": "vibe-cdn",
       "account_id": "bfcb6ac5b3ceaf42a09607f6f7925823",
+      "workers_dev": false,
       "vars": {
         "ENVIRONMENT": "production",
         "ALLOW_DEV_UPLOADS": "false"
@@ -93,7 +94,7 @@
         "directory": "./app/dist",
         "binding": "APP_ASSETS",
         "not_found_handling": "single-page-application",
-        "run_worker_first": ["/embed", "/embed/*", "/demo", "/install", "/docs", "/health", "/manifest.json", "/cdn/*", "/__dev/*", "/api/*", "/u/*", "/ws/*"]
+        "run_worker_first": ["/embed", "/embed/*", "/demo", "/demo2", "/install", "/docs", "/health", "/manifest.json", "/cdn/*", "/__dev/*", "/api/*", "/u/*", "/ws/*"]
       },
       "observability": { "enabled": true }
     }
