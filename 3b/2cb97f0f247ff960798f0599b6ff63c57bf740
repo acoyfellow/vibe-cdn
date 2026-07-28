@@ -1,0 +1,27 @@
+README.md
+  s_c8608720a9aca0::t_3a109f296362af 31-33,90
+src/shared/ratelimit.ts
+  s_c8608720a9aca0::t_31ce890eea8980 1-35
+src/worker/routes/scores.ts
+  s_c8608720a9aca0::t_1a6fdb6ee4a912 1-8,29-38,51-56
+src/worker/routes/uploads.ts
+  s_c8608720a9aca0::t_0cedae89213514 15,65-68,71-72,76
+test/ratelimit.test.ts
+  s_c8608720a9aca0::t_cd9c67aaa03386 1-126
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "3b2cb97f0f247ff960798f0599b6ff63c57bf740",
+  "prompts": {},
+  "sessions": {
+    "s_c8608720a9aca0": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "019f435b-44f1-750c-911d-62ea6492e54d",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Jordan Coeyman <jcoeyman@cloudflare.com>"
+    }
+  }
+}
