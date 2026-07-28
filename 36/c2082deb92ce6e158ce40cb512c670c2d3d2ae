@@ -1,0 +1,19 @@
+src/worker/LobbyDO.ts
+  s_2a77a1542d3982::t_1eae071c67a808 172-181
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "36c2082deb92ce6e158ce40cb512c670c2d3d2ae",
+  "prompts": {},
+  "sessions": {
+    "s_2a77a1542d3982": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "019e4aeb-bfd3-7cb8-82c3-9b8c799f4c6e",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Jordan Coeyman <jcoeyman@cloudflare.com>"
+    }
+  }
+}
