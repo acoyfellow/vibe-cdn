@@ -12,6 +12,7 @@
 //     applied at the bucket level (auto-deletion is R2's job, not ours).
 //   - Public GETs are CORS-open and cache-immutable for 24h.
 
+import { clientIp, hourBucket, rateCounterKey, rateDecision } from '../../shared/ratelimit'
 import { contentTypeForKey } from '../../shared/mime'
 import type { Env } from '../env'
 import { corsHeaders, json, withCors } from '../http'
@@ -61,18 +62,18 @@ export async function handleUpload(request: Request, env: Env): Promise<Response
 
   // 3. Per-IP rate limit. CF gives us `cf-connecting-ip`; if absent we still
   // count under "anon" so local dev exercises the path.
-  const ip = request.headers.get('cf-connecting-ip') ?? 'anon'
-  const hourBucket = new Date().toISOString().slice(0, 13) // YYYY-MM-DDTHH
-  const counterKey = `rate:upload:${ip}:${hourBucket}`
-  const current = Number((await env.SAVES.get(counterKey)) ?? '0')
-  if (current >= RATE_LIMIT_PER_HOUR) {
+  const ip = clientIp(request.headers.get('cf-connecting-ip'))
+  const counterKey = rateCounterKey('upload', ip, hourBucket(Date.now()))
+  const decision = rateDecision(await env.SAVES.get(counterKey), RATE_LIMIT_PER_HOUR)
+  if (!decision.allowed) {
     return withCors(
       json(
-        { ok: false, error: `rate limit: ${RATE_LIMIT_PER_HOUR} uploads per hour per IP. try again later.` },
-        { status: 429 },
+        { ok: false, error: `rate limit: ${decision.limit} uploads per hour per IP. try again later.` },
+        { status: 429, headers: { 'retry-after': '3600' } },
       ),
     )
   }
+  const current = decision.used
 
   // 4. Read the body up to the cap. The Worker fetch body is a stream; we
   // tee it through a TransformStream that aborts past MAX_BYTES.

@@ -28,6 +28,9 @@ The arena is also a combat game. You have 100 HP, a hitscan weapon, and a shared
 - **Winning** broadcasts `bossDefeated` to the whole room with who landed the kill and how many
   shots the fight took. **Dying** shows a lose banner and respawns you with full HP.
 - **Fire rate is limited** server-side (180ms between shots, burst-limited spawns).
+- **Write paths are bounded**, per IP per hour: 5 uploads, 20 score submissions (429 +
+  `retry-after`), and the leaderboard is trimmed to its top 1000 rows so D1 cannot grow without
+  limit. Scores are still client-submitted, not derived from server combat state.
 
 `/demo2` is the living-arena page: spawn entities, fight the boss, watch the room state.
 
@@ -84,7 +87,7 @@ Visitors to your page join the same Durable Object room as visitors to vibe-cdn.
 | **Workers**        | The CDN edge: MIME, Range, ETag, CORS     | every route above                 |
 | **Durable Object** | Rooms, ghost cars, combat, boss, entities | `/ws/lobby/:id`                   |
 | **D1**             | Leaderboards + game saves                 | `/api/scores`, `/api/saves/...`   |
-| **KV**             | Per-IP upload rate limits (hourly counter)| (bound, used internally)          |
+| **KV**             | Per-IP hourly rate limits: uploads and score writes | (bound, used internally) |
 | **Live stats**     | Aggregated counts from the bindings       | `/api/stats`                      |
 | **Cost model**     | Pure math, sliders to play with           | `/api/cost/estimate`              |
 | **Embed view**     | Just the arena, no chrome, iframe-ready   | `/embed/arena`                    |

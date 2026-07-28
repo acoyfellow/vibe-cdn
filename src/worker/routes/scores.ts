@@ -1,3 +1,11 @@
+import {
+  MAX_LEADERBOARD_ROWS,
+  SCORE_WRITES_PER_HOUR,
+  clientIp,
+  hourBucket,
+  rateCounterKey,
+  rateDecision,
+} from '../../shared/ratelimit'
 import { validateName, validateScore } from '../../shared/validate'
 import type { Env } from '../env'
 import { json, readJson } from '../http'
@@ -18,6 +26,16 @@ export async function handleScores(request: Request, env: Env): Promise<Response
       return json({ ok: false, error: 'expected JSON body' }, { status: 400 })
     }
 
+    const ip = clientIp(request.headers.get('cf-connecting-ip'))
+    const counterKey = rateCounterKey('scores', ip, hourBucket(Date.now()))
+    const decision = rateDecision(await env.SAVES.get(counterKey), SCORE_WRITES_PER_HOUR)
+    if (!decision.allowed) {
+      return json(
+        { ok: false, error: `rate limit: ${decision.limit} score writes per hour per IP. try again later.` },
+        { status: 429, headers: { 'retry-after': '3600' } },
+      )
+    }
+
     const scoreResult = validateScore(body.score)
     if (!scoreResult.ok) return json({ ok: false, error: scoreResult.error }, { status: 400 })
     const nameResult = validateName(body.name)
@@ -29,6 +47,12 @@ export async function handleScores(request: Request, env: Env): Promise<Response
     const createdAt = new Date().toISOString()
     await env.DB.prepare('INSERT INTO scores (id, name, score, created_at) VALUES (?, ?, ?, ?)')
       .bind(id, name, score, createdAt)
+      .run()
+    await env.SAVES.put(counterKey, String(decision.used + 1), { expirationTtl: 3600 })
+    await env.DB.prepare(
+      'DELETE FROM scores WHERE id NOT IN (SELECT id FROM scores ORDER BY score DESC, created_at ASC LIMIT ?)',
+    )
+      .bind(MAX_LEADERBOARD_ROWS)
       .run()
     return json({ ok: true, score: { id, name, score, createdAt } })
   }
