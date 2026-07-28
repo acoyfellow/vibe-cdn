@@ -7,6 +7,25 @@ export const SHOT_DAMAGE = 20
 export const BOSS_TOUCH_RANGE = 4
 export const BOSS_TOUCH_DAMAGE = 8
 
+export const FIRE_COOLDOWN_MS = 180
+export const SPAWN_COOLDOWN_MS = 1000
+export const SPAWN_BURST = 3
+
+export type RateGate = { allowedAt: number; tokens: number }
+
+export function checkCooldown(lastAt: number | undefined, now: number, cooldownMs: number): boolean {
+  if (typeof lastAt !== 'number' || !Number.isFinite(lastAt)) return true
+  return now - lastAt >= cooldownMs
+}
+
+export function takeToken(gate: RateGate | undefined, now: number, refillMs: number, burst: number): { ok: boolean; gate: RateGate } {
+  const current: RateGate = gate && Number.isFinite(gate.allowedAt) ? gate : { allowedAt: 0, tokens: burst }
+  const elapsed = Math.max(0, now - current.allowedAt)
+  const refilled = Math.min(burst, current.tokens + Math.floor(elapsed / refillMs))
+  if (refilled <= 0) return { ok: false, gate: { allowedAt: current.allowedAt, tokens: 0 } }
+  return { ok: true, gate: { allowedAt: now, tokens: refilled - 1 } }
+}
+
 export function rayHitDistance(
   ox: number,
   oz: number,

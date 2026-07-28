@@ -25,18 +25,26 @@ import {
   BOSS_MAX_HP,
   BOSS_TOUCH_DAMAGE,
   BOSS_TOUCH_RANGE,
+  FIRE_COOLDOWN_MS,
   PLAYER_MAX_HP,
   SHOT_DAMAGE,
   SHOT_RANGE,
+  SPAWN_BURST,
+  SPAWN_COOLDOWN_MS,
+  type RateGate,
+  checkCooldown,
   rayHitDistance,
+  takeToken,
 } from '../shared/combat'
+import { backfillEntity, leaderFrom, shouldPersist } from '../shared/lobby-logic'
 
 const TICK_HZ = 20
 const TICK_MS = 1000 / TICK_HZ
 const MAX_ENTITIES = 64
 const ENTITIES_KEY = 'arena:entities'
+const ENTITY_PERSIST_MS = 1000
 
-type PlayerState = LobbyPlayer & { lastSeq: number }
+type PlayerState = LobbyPlayer & { lastSeq: number; lastFireAt?: number; spawnGate?: RateGate }
 
 export class LobbyDO extends Agent<Env> {
   static options = { hibernate: true }
@@ -46,16 +54,29 @@ export class LobbyDO extends Agent<Env> {
   private entities = new Map<string, ArenaEntity>()
   private entitiesLoaded = false
   private lastBossHit = new Map<string, number>()
+  private entitiesDirty = false
+  private lastPersistAt = 0
 
   private async ensureEntitiesLoaded(): Promise<void> {
     if (this.entitiesLoaded) return
     const stored = await this.ctx.storage.get<ArenaEntity[]>(ENTITIES_KEY)
-    if (stored) for (const e of stored) this.entities.set(e.id, e)
+    if (stored) for (const e of stored) this.entities.set(e.id, backfillEntity(e))
     this.entitiesLoaded = true
   }
 
   private async persistEntities(): Promise<void> {
+    this.entitiesDirty = false
+    this.lastPersistAt = Date.now()
     await this.ctx.storage.put(ENTITIES_KEY, [...this.entities.values()])
+  }
+
+  private markEntitiesDirty(): void {
+    this.entitiesDirty = true
+  }
+
+  private maybePersistEntities(now: number): void {
+    if (!shouldPersist(this.entitiesDirty, this.lastPersistAt, now, ENTITY_PERSIST_MS)) return
+    void this.persistEntities()
   }
 
   onConnect(connection: Connection, _ctx: ConnectionContext): void {
@@ -141,10 +162,20 @@ export class LobbyDO extends Agent<Env> {
         return
       }
       case 'fire': {
-        this.resolveShot(connection, player, finite(message.x), finite(message.z), finite(message.ry))
+        const now = Date.now()
+        if (!checkCooldown(player.lastFireAt, now, FIRE_COOLDOWN_MS)) return
+        connection.setState({ ...player, lastFireAt: now })
+        this.resolveShot(connection, { ...player, lastFireAt: now }, finite(message.x), finite(message.z), finite(message.ry))
         return
       }
       case 'spawn': {
+        const now = Date.now()
+        const gate = takeToken(player.spawnGate, now, SPAWN_COOLDOWN_MS, SPAWN_BURST)
+        if (!gate.ok) {
+          this.sendTo(connection, { type: 'error', message: 'spawn rate limit' })
+          return
+        }
+        connection.setState({ ...player, spawnGate: gate.gate })
         void this.spawnEntity({
           kind: message.kind === 'boss' ? 'boss' : 'prop',
           url: message.url,
@@ -275,8 +306,11 @@ export class LobbyDO extends Agent<Env> {
         if (boss.hp <= 0) {
           this.entities.delete(hitId)
           shooter.setState({ ...player, kills: (player.kills ?? 0) + 1 })
+          void this.persistEntities()
+        } else {
+          this.markEntitiesDirty()
+          this.maybePersistEntities(Date.now())
         }
-        void this.persistEntities()
       }
     }
   }
@@ -335,12 +369,7 @@ export class LobbyDO extends Agent<Env> {
   }
 
   private leaderId(players: LobbyPlayer[]): string | undefined {
-    let best: LobbyPlayer | undefined
-    for (const p of players) {
-      if ((p.lap ?? 0) <= 0) continue
-      if (!best || (p.lap ?? 0) > (best.lap ?? 0)) best = p
-    }
-    return best?.id
+    return leaderFrom(players)
   }
 
   private stepBoss(players: LobbyPlayer[]): void {
@@ -370,7 +399,8 @@ export class LobbyDO extends Agent<Env> {
       }
       if (len <= BOSS_TOUCH_RANGE) this.bossTouch(boss.id)
     }
-    if (changed) void this.persistEntities()
+    if (changed) this.markEntitiesDirty()
+    this.maybePersistEntities(Date.now())
   }
 
   private bossTouch(bossId: string): void {
