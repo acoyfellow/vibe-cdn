@@ -229,6 +229,7 @@ export function racePanel(): HTMLElement {
       if (mesh) {
         mesh.position.x = entity.x
         mesh.position.z = entity.z
+        mesh.position.y = terrain.heightAt(entity.x, entity.z)
         mesh.rotation.y = entity.ry
         if (entity.kind === 'boss' && typeof entity.hp === 'number') {
           const prev = bossHp.get(entity.id)

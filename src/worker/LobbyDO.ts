@@ -169,6 +169,16 @@ export class LobbyDO extends Agent<Env> {
     ownerId?: string
   }): Promise<void> {
     await this.ensureEntitiesLoaded()
+    if (input.kind === 'boss') {
+      let exists = false
+      for (const e of this.entities.values()) {
+        if (e.kind === 'boss') {
+          exists = true
+          break
+        }
+      }
+      if (exists) return
+    }
     if (this.entities.size >= MAX_ENTITIES) {
       const oldest = [...this.entities.values()].sort((a, b) => a.createdAt - b.createdAt)[0]
       if (oldest) this.entities.delete(oldest.id)
