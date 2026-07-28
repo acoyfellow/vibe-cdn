@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - run: bun install --frozen-lockfile
+
+      - name: Typecheck
+        run: bun run check
+
+      - name: Assert the test suite is not empty
+        run: |
+          count=$(find test -name '*.test.ts' | wc -l | tr -d ' ')
+          echo "test files: $count"
+          if [ "$count" -lt 1 ]; then
+            echo "::error::no test files found; bun test would exit 0 and report a false green"
+            exit 1
+          fi
+
+      - name: Test
+        run: bun test

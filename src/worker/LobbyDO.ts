@@ -21,18 +21,20 @@ import type {
   LobbyPlayer,
   LobbyServerMessage,
 } from '../shared/contracts'
+import {
+  BOSS_MAX_HP,
+  BOSS_TOUCH_DAMAGE,
+  BOSS_TOUCH_RANGE,
+  PLAYER_MAX_HP,
+  SHOT_DAMAGE,
+  SHOT_RANGE,
+  rayHitDistance,
+} from '../shared/combat'
 
 const TICK_HZ = 20
 const TICK_MS = 1000 / TICK_HZ
 const MAX_ENTITIES = 64
 const ENTITIES_KEY = 'arena:entities'
-const PLAYER_MAX_HP = 100
-const BOSS_MAX_HP = 100
-const SHOT_RANGE = 60
-const SHOT_CONE = 0.35
-const SHOT_DAMAGE = 20
-const BOSS_TOUCH_RANGE = 4
-const BOSS_TOUCH_DAMAGE = 8
 
 type PlayerState = LobbyPlayer & { lastSeq: number }
 
@@ -220,7 +222,7 @@ export class LobbyDO extends Agent<Env> {
     for (const c of this.getConnections<PlayerState>()) {
       const t = c.state
       if (!t || t.id === player.id || (t.hp ?? 0) <= 0) continue
-      const d = this.rayHitDistance(x, z, dirX, dirZ, t.x, t.z, bestDist)
+      const d = rayHitDistance(x, z, dirX, dirZ, t.x, t.z, bestDist)
       if (d !== null && d < bestDist) {
         bestDist = d
         hitId = t.id
@@ -234,7 +236,7 @@ export class LobbyDO extends Agent<Env> {
         e.maxHp = BOSS_MAX_HP
       }
       if (e.hp <= 0) continue
-      const d = this.rayHitDistance(x, z, dirX, dirZ, e.x, e.z, bestDist)
+      const d = rayHitDistance(x, z, dirX, dirZ, e.x, e.z, bestDist)
       if (d !== null && d < bestDist) {
         bestDist = d
         hitId = e.id
@@ -277,26 +279,6 @@ export class LobbyDO extends Agent<Env> {
         void this.persistEntities()
       }
     }
-  }
-
-  private rayHitDistance(
-    ox: number,
-    oz: number,
-    dx: number,
-    dz: number,
-    tx: number,
-    tz: number,
-    maxDist: number,
-  ): number | null {
-    const relX = tx - ox
-    const relZ = tz - oz
-    const along = relX * dx + relZ * dz
-    if (along <= 0 || along > maxDist) return null
-    const perpX = relX - along * dx
-    const perpZ = relZ - along * dz
-    const perp = Math.hypot(perpX, perpZ)
-    if (perp > SHOT_CONE * along + 1.5) return null
-    return along
   }
 
   onClose(_connection: Connection): void {
