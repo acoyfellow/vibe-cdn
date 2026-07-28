@@ -58,7 +58,7 @@ bun run demo
 
 Then open the URL it prints. The page is the product:
 
-- a **live stats ticker** counting real assets, requests, scores, saves
+- a **live stats ticker** counting real assets, bytes on R2, live uploads, scores, saves
 - a **drop zone** that accepts your model and gives back an edge-cached URL
 - an **open multiplayer arena** — drive a Ferrari, see other visitors as ghost cars
 - seven **receipts panels** below — every primitive on the stack, wired, probed, and clickable
@@ -96,7 +96,7 @@ Visitors to your page join the same Durable Object room as visitors to vibe-cdn.
 ## How the asset path works
 
 ```text
-GET /assets/demo/helmet.glb
+GET /cdn/demo/helmet.glb
     Range: bytes=0-1048575
 
 1. Cloudflare edge:  cache lookup against the immutable URL
@@ -176,11 +176,14 @@ This repo bundles those primitives into one starter you can clone, deploy, and s
 
 What "tested" means here, precisely:
 
-- **`bun test` — 103 unit tests, 0 failing.** These cover the pure logic extracted into
-  `src/shared/`: combat math (`test/combat.test.ts`), input validation
-  (`test/validate.test.ts`), and lobby/protocol logic (`test/lobby.test.ts`). The crosshair
-  test cross-checks the client's aim prediction against the server's own hit function across
-  61 angles x 6 distances and asserts they never disagree.
+- **`bun test` — 159 unit tests across 6 files, 0 failing.** These cover the pure logic
+  extracted into `src/shared/`: combat math (`test/combat.test.ts`), input validation
+  (`test/validate.test.ts`), lobby/protocol logic (`test/lobby.test.ts`), entity lifecycle and
+  boss chase (`test/entities.test.ts`), write rate limiting (`test/ratelimit.test.ts`), and
+  asset-404 routing (`test/routing.test.ts`). The crosshair test cross-checks the client's aim
+  prediction against the server's own hit function across 61 angles x 6 distances and asserts
+  they never disagree. Run `bun test` yourself — that count is the tool's own output, not a
+  number maintained by hand.
 - **`bun run check`** is `tsc --noEmit` over the worker, the app, and the tests.
 - **`bun run smoke`** is an end-to-end HTTP pass against a running worker, not unit coverage.
 - **Live WebSocket probes** in [`.loop/receipts/`](.loop/receipts/) drive real Durable Objects

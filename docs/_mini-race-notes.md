@@ -3,7 +3,7 @@
 Concrete, well-trodden patterns for a Three.js + Cloudflare Durable Object multiplayer racing demo. Each section: minimal snippet + source.
 
 Existing repo state (vibe-cdn):
-- `app/src/panels/gltf.ts` — Three.js + GLTFLoader + OrbitControls (loads `/assets/demo/car.glb`)
+- (removed) `app/src/panels/gltf.ts` — was an unmounted Three.js viewer panel; deleted as dead code
 - `src/worker/LobbyDO.ts` — DO already broadcasts `{type:'move',x,y,z}` and `{type:'snapshot',players:[...]}`
 - `src/shared/contracts.ts` — `LobbyClientMessage` / `LobbyServerMessage` already define `move`/`snapshot`/`ping`/`pong`
 

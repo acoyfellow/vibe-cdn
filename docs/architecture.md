@@ -28,18 +28,36 @@ Five Cloudflare primitives, one Worker as the front door. Every box is a real pi
 |-------------------------------|---------------|-------------------------------|--------------------------------------------------|
 | `/health`                     | GET           | none                          | Liveness + binding presence                      |
 | `/manifest.json`              | GET, HEAD     | R2 GET `__manifest.json`      | Asset catalog for the client                     |
-| `/assets/:key`                | GET, HEAD     | R2 GET, HEAD                  | The CDN edge for game assets                     |
+| `/cdn/:key`                   | GET, HEAD     | R2 GET, HEAD                  | The CDN edge for game assets                     |
+| `POST /api/u`                 | POST          | R2 PUT (uploads bucket)       | Public ephemeral drop, 24h TTL, rate limited     |
+| `/u/:key`                     | GET, HEAD     | R2 GET, HEAD (uploads bucket) | Serve an ephemeral drop                          |
 | `/__dev/upload/:key`          | PUT, OPTIONS  | R2 PUT                        | Local-only convenience; 403 in production        |
-| `/api/scores`                 | GET, POST     | D1 SELECT, INSERT             | Leaderboard                                      |
+| `/api/scores`                 | GET, POST     | D1 SELECT, INSERT             | Leaderboard; writes rate limited + table trimmed |
 | `/api/saves/:player/:slot`    | GET, PUT      | KV get, put                   | Per-player save blob                             |
+| `/api/stats`                  | GET           | R2 list, D1 count, KV list    | Live counts for the homepage ticker              |
 | `/api/cost/estimate`          | GET           | none (pure math)              | Cost calculator                                  |
 | `/ws/lobby/:id`               | GET (upgrade) | DO fetch + WebSocket          | Multiplayer room                                 |
+| `/demo`, `/demo2`, `/install`, `/docs`, `/embed/*` | GET | `APP_ASSETS.fetch` | Pretty page routes mapped to built HTML bundles |
+| an asset-looking 404          | any           | none                          | `404 {ok:false,error}` — see "Honest 404s" below |
 | anything else                 | any           | `APP_ASSETS.fetch(request)`   | Serve the built SPA                              |
+
+Every row above was verified live against `https://vibe-cdn.coey.dev`: the six `/api` and page
+routes return 200, `POST /api/u` with no body returns 415, `PUT /__dev/upload/x` returns 403 in
+production, and `/u/nope` and `/nope.glb` both return 404.
+
+### Honest 404s
+
+The assets binding runs with `not_found_handling: "single-page-application"`, which by itself
+returns the SPA shell with a **200** for any unmatched path — including `/missing.glb`. A game
+client asking for a model would then parse HTML as binary. So `wrangler.jsonc` sets
+`run_worker_first: true` and the worker's final fallback checks whether the binding served the
+shell for a path that looks like a static file (`src/shared/routing.ts`); if so it returns a real
+404 instead. Extensions covered are in `STATIC_FILE_EXTENSIONS_THAT_MUST_404`.
 
 ## The asset path, end to end
 
 ```text
-GET /assets/demo/track.glb
+GET /cdn/demo/track.glb
     Range: bytes=0-1048575
 
 1. Cloudflare edge:
