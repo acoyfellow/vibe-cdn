@@ -279,6 +279,7 @@ export function racePanel(): HTMLElement {
   let interpolationDelayMs = MIN_INTERP_MS
   let pingTimer: number | null = null
   let raf = 0
+  let hiddenTimer: number | null = null
   let lastFrameAt = performance.now()
   let userHasDriven = false
   let idleStartedAt = performance.now()
@@ -532,7 +533,38 @@ export function racePanel(): HTMLElement {
     seq++
     send({ type: 'move', x, y: carGroup.position.y, z, ry, seq, t: performance.now() })
   }
-  ;(stage as unknown as { __arena: unknown }).__arena = { dropModelIntoArena, spawnBoss, fireNetworked, testPlace }
+  const probe = () => {
+    const cam = camera as unknown as {
+      position: THREE.Vector3
+      projectionMatrix: unknown
+      matrixWorldInverse: unknown
+    }
+    const bosses = [...entityMeshes.entries()]
+      .filter(([id]) => bossHp.has(id))
+      .map(([id, m]) => {
+        const p = (m.position as unknown as { clone(): THREE.Vector3 }).clone()
+        const ndc = (p as unknown as { project(c: unknown): THREE.Vector3 }).project(camera)
+        const dx = m.position.x - carGroup.position.x
+        const dz = m.position.z - carGroup.position.z
+        return {
+          id,
+          worldY: +m.position.y.toFixed(2),
+          groundY: +terrain.heightAt(m.position.x, m.position.z).toFixed(2),
+          dist: +Math.hypot(dx, dz).toFixed(1),
+          ndc: [+ndc.x.toFixed(2), +ndc.y.toFixed(2), +ndc.z.toFixed(2)],
+          onScreen: ndc.x >= -1 && ndc.x <= 1 && ndc.y >= -1 && ndc.y <= 1 && ndc.z < 1,
+          hp: bossHp.get(id),
+        }
+      })
+    return {
+      cam: [+cam.position.x.toFixed(1), +cam.position.y.toFixed(1), +cam.position.z.toFixed(1)],
+      car: [+carGroup.position.x.toFixed(1), +carGroup.position.y.toFixed(1), +carGroup.position.z.toFixed(1)],
+      carYaw: +carGroup.rotation.y.toFixed(2),
+      bosses,
+      entities: entityMeshes.size,
+    }
+  }
+  ;(stage as unknown as { __arena: unknown }).__arena = { dropModelIntoArena, spawnBoss, fireNetworked, testPlace, probe }
 
   const uploadAndDrop = async (file: File) => {
     const name = file.name.toLowerCase()
@@ -633,7 +665,7 @@ export function racePanel(): HTMLElement {
   window.addEventListener('keyup', onKeyUp)
 
   // ── Render loop ───────────────────────────────────────────────────────
-  const tick = (now: number) => {
+  const frame = (now: number) => {
     const dt = Math.min(0.05, (now - lastFrameAt) / 1000)
     lastFrameAt = now
     updateCar(dt)
@@ -661,7 +693,29 @@ export function racePanel(): HTMLElement {
     interpolateGhosts(now)
     maybeSendMove(now)
     renderer.render(scene, camera)
+  }
+
+  const tick = (now: number) => {
+    frame(now)
     raf = requestAnimationFrame(tick)
+  }
+
+  const startLoop = () => {
+    if (document.hidden) {
+      if (raf) {
+        cancelAnimationFrame(raf)
+        raf = 0
+      }
+      if (hiddenTimer === null) {
+        hiddenTimer = window.setInterval(() => frame(performance.now()), 1000 / 30)
+      }
+    } else {
+      if (hiddenTimer !== null) {
+        clearInterval(hiddenTimer)
+        hiddenTimer = null
+      }
+      if (!raf) raf = requestAnimationFrame(tick)
+    }
   }
 
   const updateCar = (dt: number) => {
@@ -938,16 +992,19 @@ export function racePanel(): HTMLElement {
     document.addEventListener('pointerdown', (e) => {
       if (!stage.contains(e.target as Node)) stageEngaged = false
     })
-    raf = requestAnimationFrame(tick)
+    startLoop()
+    document.addEventListener('visibilitychange', startLoop)
     void loadCar()
   })
 
   const observer = new MutationObserver(() => {
     if (!document.body.contains(body)) {
       cancelAnimationFrame(raf)
+      if (hiddenTimer !== null) clearInterval(hiddenTimer)
       window.removeEventListener('resize', resize)
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('keyup', onKeyUp)
+      document.removeEventListener('visibilitychange', startLoop)
       disconnect()
       renderer.dispose()
       observer.disconnect()
