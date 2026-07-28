@@ -17,6 +17,20 @@ Drive a Ferrari around an open arena. Every visitor on the same URL appears as a
 
 ![Ferrari on the arena, HUD shows top speed and live player count.](docs/screenshots/race.png)
 
+The arena is also a combat game. You have 100 HP, a hitscan weapon, and a shared boss to hunt.
+
+- **Shooting is server-authoritative.** The client sends `fire`; the Durable Object runs the ray
+  test and decides what was hit. A client cannot award itself a kill.
+- **Aiming** uses a center crosshair that turns gold when the boss is genuinely inside the weapon
+  cone and range, and red only when the server confirms your shot connected.
+- **Finding the boss** uses a tracker showing its distance, HP, and bearing, so it is never
+  lost off-screen.
+- **Winning** broadcasts `bossDefeated` to the whole room with who landed the kill and how many
+  shots the fight took. **Dying** shows a lose banner and respawns you with full HP.
+- **Fire rate is limited** server-side (180ms between shots, burst-limited spawns).
+
+`/demo2` is the living-arena page: spawn entities, fight the boss, watch the room state.
+
 ## Quick start
 
 Three options.
@@ -68,12 +82,13 @@ Visitors to your page join the same Durable Object room as visitors to vibe-cdn.
 | **R2 (assets)**    | Big, immutable, content-addressable files | `/assets/:key`, `/manifest.json`  |
 | **R2 (uploads)**   | Public ephemeral drops (24-hour TTL)      | `POST /api/u`, `/u/:key`          |
 | **Workers**        | The CDN edge: MIME, Range, ETag, CORS     | every route above                 |
-| **Durable Object** | Multiplayer rooms over WebSocket          | `/ws/lobby/:id`                   |
+| **Durable Object** | Rooms, ghost cars, combat, boss, entities | `/ws/lobby/:id`                   |
 | **D1**             | Leaderboards + game saves                 | `/api/scores`, `/api/saves/...`   |
-| **KV**             | Per-IP rate limits, edge caches           | (bound, used internally)          |
+| **KV**             | Per-IP upload rate limits (hourly counter)| (bound, used internally)          |
 | **Live stats**     | Aggregated counts from the bindings       | `/api/stats`                      |
 | **Cost model**     | Pure math, sliders to play with           | `/api/cost/estimate`              |
 | **Embed view**     | Just the arena, no chrome, iframe-ready   | `/embed/arena`                    |
+| **Living arena**   | Spawn entities and fight the shared boss  | `/demo2`                          |
 
 ## How the asset path works
 
@@ -112,6 +127,7 @@ bun run dev:worker # wrangler only
 bun run seed       # regenerate fixtures and re-upload to local R2
 bun run optimize   # gltf-transform pipeline on a glb
 bun run smoke      # end-to-end checks against the local worker
+bun test           # unit tests for combat math, validation, lobby logic
 bun run check      # typecheck
 bun run build      # build app + dry-run worker deploy
 bun run deploy     # ship to your Cloudflare account
@@ -153,6 +169,23 @@ This repo bundles those primitives into one starter you can clone, deploy, and s
 
 ## Status
 
-`0.1.0`. Local-tested. Production-tested at https://vibe-cdn.coey.dev.
+`0.1.0`. Live at https://vibe-cdn.coey.dev.
+
+What "tested" means here, precisely:
+
+- **`bun test` — 103 unit tests, 0 failing.** These cover the pure logic extracted into
+  `src/shared/`: combat math (`test/combat.test.ts`), input validation
+  (`test/validate.test.ts`), and lobby/protocol logic (`test/lobby.test.ts`). The crosshair
+  test cross-checks the client's aim prediction against the server's own hit function across
+  61 angles x 6 distances and asserts they never disagree.
+- **`bun run check`** is `tsc --noEmit` over the worker, the app, and the tests.
+- **`bun run smoke`** is an end-to-end HTTP pass against a running worker, not unit coverage.
+- **Live WebSocket probes** in [`.loop/receipts/`](.loop/receipts/) drive real Durable Objects
+  with multiple clients to verify death/respawn, the boss-defeated broadcast, rate limits, and
+  the single-boss guard.
+
+Not yet covered: the Three.js rendering layer has no automated tests, and the
+`src/worker/` request handlers are exercised only through smoke and live probes rather than
+unit tests, because importing the Durable Object pulls in the `agents` runtime.
 
 MIT. Built by [@acoyfellow](https://x.com/acoyfellow).

@@ -117,6 +117,10 @@ const why = el('section', {
           'Durable Objects give each room a single-writer state machine. Open the demo in two tabs and the second car appears in the first. Same room everywhere on the planet.',
         ),
         whyCard(
+          'server-authoritative combat',
+          'The arena is a game, not a scene. Hitscan shooting, HP, kills, and a shared boss all resolve inside the Durable Object, so a client cannot award itself a kill. Fire rate is limited server-side.',
+        ),
+        whyCard(
           'one deploy',
           `Click the deploy button or run \`npx tiged ${brand.repoSlug} my-game\`. R2, Workers, DO, D1, KV are provisioned for you. Your domain. Your account. MIT.`,
         ),

@@ -11,7 +11,7 @@ import {
 import type { ArenaEntity, LobbyPlayer } from '../src/shared/contracts'
 
 function player(over: Partial<LobbyPlayer> & { id: string }): LobbyPlayer {
-  return { id: over.id, name: over.id, x: 0, y: 0, z: 0, ry: 0, seenAt: 0, ...over }
+  return { name: over.id, x: 0, y: 0, z: 0, ry: 0, seenAt: 0, ...over }
 }
 
 describe('leaderFrom (K5: leaderId keyed on a lap message no client sends)', () => {
