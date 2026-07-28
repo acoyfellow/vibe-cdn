@@ -1,0 +1,19 @@
+README.md
+  s_fc73a7c9587683::t_deb2517782f6fe 179,182-184,190-194
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "61bfff65ebd30cbb79026ff4f90d102cd38ae431",
+  "prompts": {},
+  "sessions": {
+    "s_fc73a7c9587683": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "019f959f-ed3f-78c4-b8f7-55e513d85ddb",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Jordan Coeyman <jcoeyman@cloudflare.com>"
+    }
+  }
+}
