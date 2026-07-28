@@ -176,19 +176,22 @@ This repo bundles those primitives into one starter you can clone, deploy, and s
 
 What "tested" means here, precisely:
 
-- **`bun test` — 159 unit tests across 6 files, 0 failing.** These cover the pure logic
+- **`bun test` — 191 unit tests across 7 files, 0 failing.** These cover the pure logic
   extracted into `src/shared/`: combat math (`test/combat.test.ts`), input validation
   (`test/validate.test.ts`), lobby/protocol logic (`test/lobby.test.ts`), entity lifecycle and
-  boss chase (`test/entities.test.ts`), write rate limiting (`test/ratelimit.test.ts`), and
-  asset-404 routing (`test/routing.test.ts`). The crosshair test cross-checks the client's aim
+  boss chase (`test/entities.test.ts`), write rate limiting (`test/ratelimit.test.ts`),
+  asset-404 routing (`test/routing.test.ts`), and respawn safety plus post-respawn immunity
+  (`test/respawn.test.ts`). The crosshair test cross-checks the client's aim
   prediction against the server's own hit function across 61 angles x 6 distances and asserts
   they never disagree. Run `bun test` yourself — that count is the tool's own output, not a
   number maintained by hand.
 - **`bun run check`** is `tsc --noEmit` over the worker, the app, and the tests.
 - **`bun run smoke`** is an end-to-end HTTP pass against a running worker, not unit coverage.
-- **Live WebSocket probes** in [`.loop/receipts/`](.loop/receipts/) drive real Durable Objects
-  with multiple clients to verify death/respawn, the boss-defeated broadcast, rate limits, and
-  the single-boss guard.
+- **Live WebSocket probes** drive real Durable Objects with multiple clients to verify
+  death/respawn, the boss-defeated broadcast, rate limits, and the single-boss guard. These are
+  not in the repo: they live in a gitignored `.loop/` working directory, they are run by hand
+  against a deployment, and CI does not execute them. Treat the edge-case and live-wire coverage
+  described in this section as manually verified, not continuously tested.
 
 Not yet covered: the Three.js rendering layer has no automated tests, and the
 `src/worker/` request handlers are exercised only through smoke and live probes rather than
