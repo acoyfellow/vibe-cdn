@@ -1,0 +1,37 @@
+app/src/panels/race.ts
+  s_fc73a7c9587683::t_0a684ff06c7d7b 23,55,65,175-190,524-525,529-532,583-589,787-793,802
+app/src/three.d.ts
+  s_fc73a7c9587683::t_80c3713a1246d0 39
+src/shared/contracts.ts
+  s_fc73a7c9587683::t_f0c283464d87b9 97
+src/shared/lobby-logic.ts
+  s_c8608720a9aca0::t_a5071cf6713bdd 40-49
+src/worker/LobbyDO.ts
+  s_fc73a7c9587683::t_e8283b342eaf07 45,420,423,497,499
+test/respawn.test.ts
+  s_c8608720a9aca0::t_8af0105160a0ba 5,224-298
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "ca717ab1d85b961d16b5852bdf735612c0533dcb",
+  "prompts": {},
+  "sessions": {
+    "s_c8608720a9aca0": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "019f435b-44f1-750c-911d-62ea6492e54d",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Jordan Coeyman <jcoeyman@cloudflare.com>"
+    },
+    "s_fc73a7c9587683": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "019f959f-ed3f-78c4-b8f7-55e513d85ddb",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Jordan Coeyman <jcoeyman@cloudflare.com>"
+    }
+  }
+}
