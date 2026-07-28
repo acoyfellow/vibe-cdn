@@ -8,6 +8,8 @@ import {
   SHOT_RANGE,
   aimVector,
   applyDamage,
+  bearingToBoss,
+  shotWouldHit,
   isLethal,
   rayHitDistance,
   shotsToKill,
@@ -113,5 +115,92 @@ describe('boss touch range', () => {
 
   test('boundary is inclusive', () => {
     expect(withinBossTouch(0, 0, 0, BOSS_TOUCH_RANGE)).toBe(true)
+  })
+})
+
+describe('bearingToBoss (KE4: no way to find the boss once it is off-screen)', () => {
+  test('a boss dead ahead reports zero relative angle and is not behind', () => {
+    const b = bearingToBoss(0, 0, 0, 0, 30)
+    expect(b.distance).toBeCloseTo(30, 5)
+    expect(b.relativeAngle).toBeCloseTo(0, 5)
+    expect(b.isBehind).toBe(false)
+  })
+
+  test('a boss directly behind is flagged behind', () => {
+    const b = bearingToBoss(0, 0, 0, 0, -30)
+    expect(b.distance).toBeCloseTo(30, 5)
+    expect(Math.abs(b.relativeAngle)).toBeCloseTo(Math.PI, 5)
+    expect(b.isBehind).toBe(true)
+  })
+
+  test('relative angle is measured against player yaw, not world axes', () => {
+    const facingBoss = bearingToBoss(0, 0, Math.PI / 2, 30, 0)
+    expect(facingBoss.relativeAngle).toBeCloseTo(0, 5)
+    expect(facingBoss.isBehind).toBe(false)
+  })
+
+  test('relative angle always stays in [-PI, PI] even for absurd yaw', () => {
+    for (const yaw of [-100, -7, 0, 7, 100, Math.PI * 6]) {
+      for (const [bx, bz] of [[10, 10], [-10, 4], [0, -22], [3, 0]]) {
+        const b = bearingToBoss(0, 0, yaw, bx, bz)
+        expect(b.relativeAngle).toBeGreaterThanOrEqual(-Math.PI)
+        expect(b.relativeAngle).toBeLessThanOrEqual(Math.PI)
+      }
+    }
+  })
+
+  test('a boss on top of the player reports zero distance without NaN', () => {
+    const b = bearingToBoss(5, 5, 1, 5, 5)
+    expect(b.distance).toBe(0)
+    expect(Number.isNaN(b.relativeAngle)).toBe(false)
+  })
+
+  test('distance is euclidean in the xz plane', () => {
+    expect(bearingToBoss(0, 0, 0, 3, 4).distance).toBeCloseTo(5, 5)
+  })
+})
+
+describe('shotWouldHit (KE3: crosshair must reflect real hit geometry)', () => {
+  test('dead ahead inside range would hit', () => {
+    expect(shotWouldHit(bearingToBoss(0, 0, 0, 0, 20))).toBe(true)
+  })
+
+  test('beyond SHOT_RANGE never hits even when perfectly aimed', () => {
+    const far = bearingToBoss(0, 0, 0, 0, SHOT_RANGE + 1)
+    expect(far.relativeAngle).toBeCloseTo(0, 5)
+    expect(shotWouldHit(far)).toBe(false)
+  })
+
+  test('the cone edge is the boundary between aim and miss', () => {
+    const justInside = { distance: 10, relativeAngle: SHOT_CONE - 0.01, isBehind: false }
+    const justOutside = { distance: 10, relativeAngle: SHOT_CONE + 0.01, isBehind: false }
+    expect(shotWouldHit(justInside)).toBe(true)
+    expect(shotWouldHit(justOutside)).toBe(false)
+  })
+
+  test('a boss behind the player is never on target', () => {
+    expect(shotWouldHit(bearingToBoss(0, 0, 0, 0, -20))).toBe(false)
+  })
+
+  test('the reticle never promises a hit the server refuses, swept over angle and range', () => {
+    let onTargetCount = 0
+    let disagreements = 0
+    for (let deg = -90; deg <= 90; deg += 3) {
+      const angle = (deg * Math.PI) / 180
+      for (const dist of [5, 15, 25, 40, 55, 59]) {
+        const bossX = Math.sin(angle) * dist
+        const bossZ = Math.cos(angle) * dist
+        const aim = aimVector(0)
+        const serverHits =
+          rayHitDistance(0, 0, aim.dx, aim.dz, bossX, bossZ, SHOT_RANGE) !== null
+        const clientSaysOnTarget = shotWouldHit(bearingToBoss(0, 0, 0, bossX, bossZ))
+        if (clientSaysOnTarget) {
+          onTargetCount++
+          if (!serverHits) disagreements++
+        }
+      }
+    }
+    expect(onTargetCount).toBeGreaterThan(20)
+    expect(disagreements).toBe(0)
   })
 })

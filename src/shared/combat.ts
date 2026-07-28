@@ -74,3 +74,35 @@ export function withinBossTouch(
 ): boolean {
   return Math.hypot(ax - bx, az - bz) <= range
 }
+
+export type BossBearing = {
+  distance: number
+  relativeAngle: number
+  isBehind: boolean
+}
+
+export function bearingToBoss(
+  playerX: number,
+  playerZ: number,
+  playerYaw: number,
+  bossX: number,
+  bossZ: number,
+): BossBearing {
+  const dx = bossX - playerX
+  const dz = bossZ - playerZ
+  const distance = Math.hypot(dx, dz)
+  const absoluteAngle = Math.atan2(dx, dz)
+  let relativeAngle = absoluteAngle - playerYaw
+  while (relativeAngle > Math.PI) relativeAngle -= Math.PI * 2
+  while (relativeAngle < -Math.PI) relativeAngle += Math.PI * 2
+  return { distance, relativeAngle, isBehind: Math.abs(relativeAngle) > Math.PI / 2 }
+}
+
+export function shotWouldHit(
+  bearing: BossBearing,
+  cone = SHOT_CONE,
+  range = SHOT_RANGE,
+): boolean {
+  if (bearing.distance > range) return false
+  return Math.abs(bearing.relativeAngle) <= cone
+}

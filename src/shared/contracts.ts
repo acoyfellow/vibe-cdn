@@ -79,6 +79,7 @@ export type ArenaEntity = {
   createdAt: number
   hp?: number
   maxHp?: number
+  shotsTaken?: number
 }
 
 export type LobbyPlayer = {
@@ -119,6 +120,14 @@ export type LobbyServerMessage =
       range: number
       hitId?: string
       hitKind?: 'player' | 'boss'
+    }
+  | {
+      type: 'bossDefeated'
+      bossId: string
+      label?: string
+      killedById: string
+      killedByName: string
+      shotsTaken: number
     }
   | {
       type: 'died'

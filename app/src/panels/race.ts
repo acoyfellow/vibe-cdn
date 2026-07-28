@@ -19,6 +19,7 @@ import type {
   LobbyPlayer,
   LobbyServerMessage,
 } from '../../../src/shared/contracts'
+import { BOSS_MAX_HP, bearingToBoss, shotWouldHit } from '../../../src/shared/combat'
 import { bigButton, el, logLine, makeStatus, panel, setStatus } from '../dom'
 import { playgroundConfig } from '../playground/config'
 import { createTerrain } from '../playground/terrain'
@@ -86,6 +87,19 @@ export function racePanel(): HTMLElement {
   hurtFlash.style.opacity = '0'
   stage.appendChild(hurtFlash)
   let hurtUntil = 0
+
+  const crosshair = el('div', { class: 'race-crosshair' })
+  stage.appendChild(crosshair)
+  let crosshairHitUntil = 0
+
+  const bossTrackerLabel = el('div', { class: 'race-boss-label' })
+  const bossTrackerArrow = el('div', { class: 'race-boss-arrow', text: '▲' })
+  const bossTracker = el('div', {
+    class: 'race-boss-tracker',
+    children: [bossTrackerArrow, bossTrackerLabel],
+  })
+  bossTracker.style.display = 'none'
+  stage.appendChild(bossTracker)
 
   // Mobile-first controls. The game cannot require a keyboard when kids are
   // opening it from a phone. The left thumb is an analog drive stick; the
@@ -251,6 +265,7 @@ export function racePanel(): HTMLElement {
   const ingestEntities = (entities: ArenaEntity[] | undefined, leader: string | undefined) => {
     leaderId = leader ?? null
     const seen = new Set<string>()
+    liveBoss = null
     for (const entity of entities ?? []) {
       seen.add(entity.id)
       let mesh = entityMeshes.get(entity.id)
@@ -263,6 +278,7 @@ export function racePanel(): HTMLElement {
         mesh.position.z = entity.z
         mesh.position.y = terrain.heightAt(entity.x, entity.z)
         mesh.rotation.y = entity.ry
+        if (entity.kind === 'boss') liveBoss = { x: entity.x, z: entity.z, hp: entity.hp ?? BOSS_MAX_HP }
         if (entity.kind === 'boss' && typeof entity.hp === 'number') {
           const prev = bossHp.get(entity.id)
           if (prev !== entity.hp) {
@@ -405,6 +421,8 @@ export function racePanel(): HTMLElement {
         ingestEntities(msg.entities, msg.leaderId)
         applyLeaderStyle()
         applyHud(msg.players)
+      } else if (msg.type === 'bossDefeated') {
+        onBossDefeated(msg)
       } else if (msg.type === 'died') {
         onDied(msg)
       } else if (msg.type === 'shot') {
@@ -493,6 +511,24 @@ export function racePanel(): HTMLElement {
 
   let acknowledgedRespawnEpoch = 0
   let deaths = 0
+  let liveBoss: { x: number; z: number; hp: number } | null = null
+
+  const onBossDefeated = (msg: {
+    bossId: string
+    label?: string
+    killedById: string
+    killedByName: string
+    shotsTaken: number
+  }) => {
+    liveBoss = null
+    bossTracker.style.display = 'none'
+    const iLandedTheKill = msg.killedById === myId
+    const title = iLandedTheKill ? 'BOSS DOWN' : 'BOSS DEFEATED'
+    const sub = iLandedTheKill
+      ? `you killed ${msg.label ?? 'the boss'} in ${msg.shotsTaken} shots`
+      : `${msg.killedByName} killed ${msg.label ?? 'the boss'} in ${msg.shotsTaken} shots`
+    showBanner(title, sub, 'win', 3400)
+  }
 
   const onDied = (msg: {
     id: string
@@ -523,6 +559,30 @@ export function racePanel(): HTMLElement {
     showBanner('WIPED OUT', `${killerLabel} got you — respawned at base`, 'lose')
   }
 
+  const updateAimAndBossTracker = (now: number) => {
+    if (!liveBoss) {
+      bossTracker.style.display = 'none'
+      crosshair.setAttribute('data-aim', 'idle')
+      crosshair.style.opacity = crosshairHitUntil > now ? '1' : '0.55'
+      return
+    }
+    const bearing = bearingToBoss(
+      carGroup.position.x,
+      carGroup.position.z,
+      carGroup.rotation.y,
+      liveBoss.x,
+      liveBoss.z,
+    )
+    const onTarget = shotWouldHit(bearing)
+    crosshair.setAttribute('data-aim', crosshairHitUntil > now ? 'hit' : onTarget ? 'on' : 'idle')
+    crosshair.style.opacity = onTarget || crosshairHitUntil > now ? '1' : '0.55'
+
+    bossTracker.style.display = 'flex'
+    bossTrackerLabel.textContent = `BOSS ${Math.round(bearing.distance)}m · ${Math.max(0, liveBoss.hp)}hp`
+    bossTrackerArrow.style.transform = `rotate(${-bearing.relativeAngle}rad)`
+    bossTracker.setAttribute('data-dir', bearing.isBehind ? 'behind' : 'ahead')
+  }
+
   const tracers: { mesh: THREE.Object3D; born: number }[] = []
 
   const renderShot = (shot: { fromId: string; x: number; z: number; ry: number; range: number; hitId?: string }) => {
@@ -534,6 +594,8 @@ export function racePanel(): HTMLElement {
     beam.rotation.y = shot.ry
     scene.add(beam as unknown as object)
     tracers.push({ mesh: beam, born: performance.now() })
+    const myShotConnected = shot.fromId === myId && !!shot.hitId
+    if (myShotConnected) crosshairHitUntil = performance.now() + 180
     if (shot.hitId) {
       const hitMesh = shot.hitId === myId ? null : ghosts.get(shot.hitId)?.mesh ?? entityMeshes.get(shot.hitId)
       const hx = hitMesh ? hitMesh.position.x : shot.x + Math.sin(shot.ry) * len
@@ -759,6 +821,7 @@ export function racePanel(): HTMLElement {
       bannerHideAt = 0
     }
     hurtFlash.style.opacity = now < hurtUntil ? String(Math.min(0.55, (hurtUntil - now) / 500)) : '0'
+    updateAimAndBossTracker(now)
     maybeSendMove(now)
     renderer.render(scene, camera)
   }

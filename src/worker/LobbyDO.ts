@@ -322,9 +322,20 @@ export class LobbyDO extends Agent<Env> {
       const boss = this.entities.get(hitId)
       if (boss) {
         boss.hp = (boss.hp ?? BOSS_MAX_HP) - SHOT_DAMAGE
+        boss.shotsTaken = (boss.shotsTaken ?? 0) + 1
         if (boss.hp <= 0) {
           this.entities.delete(hitId)
           shooter.setState({ ...player, kills: (player.kills ?? 0) + 1 })
+          this.broadcast(
+            JSON.stringify({
+              type: 'bossDefeated',
+              bossId: boss.id,
+              label: boss.label,
+              killedById: player.id,
+              killedByName: player.name,
+              shotsTaken: boss.shotsTaken,
+            } satisfies LobbyServerMessage),
+          )
           void this.persistEntities()
         } else {
           this.markEntitiesDirty()
