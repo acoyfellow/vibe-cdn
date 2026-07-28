@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { backfillEntity, leaderFrom, shouldPersist } from '../src/shared/lobby-logic'
+import { backfillEntity, leaderFrom, moveIsFromCurrentRespawnEpoch, shouldPersist } from '../src/shared/lobby-logic'
 import {
   BOSS_MAX_HP,
   FIRE_COOLDOWN_MS,
@@ -184,5 +184,47 @@ describe('shouldPersist (K2: a storage write on every 20Hz tick)', () => {
 
   test('a corrupt lastPersistAt does not wedge persistence off', () => {
     expect(shouldPersist(true, Number.NaN, 500, MIN)).toBe(true)
+  })
+})
+
+describe('moveIsFromCurrentRespawnEpoch (KE1: in-flight moves clobbered the authoritative respawn)', () => {
+  test('a move echoing the current epoch is accepted', () => {
+    expect(moveIsFromCurrentRespawnEpoch({ playerEpoch: 3, messageEpoch: 3, now: 0 })).toBe(true)
+  })
+
+  test('a move carrying a STALE epoch is rejected', () => {
+    expect(moveIsFromCurrentRespawnEpoch({ playerEpoch: 3, messageEpoch: 2, now: 0 })).toBe(false)
+  })
+
+  test('a move from the future epoch is accepted (never wedge the player)', () => {
+    expect(moveIsFromCurrentRespawnEpoch({ playerEpoch: 3, messageEpoch: 4, now: 0 })).toBe(true)
+  })
+
+  test('an epoch-less legacy client is ignored only for the grace window', () => {
+    const respawnAt = 1000
+    expect(moveIsFromCurrentRespawnEpoch({ playerEpoch: 1, respawnAt, now: 1000, graceMs: 700 })).toBe(false)
+    expect(moveIsFromCurrentRespawnEpoch({ playerEpoch: 1, respawnAt, now: 1699, graceMs: 700 })).toBe(false)
+    expect(moveIsFromCurrentRespawnEpoch({ playerEpoch: 1, respawnAt, now: 1700, graceMs: 700 })).toBe(true)
+  })
+
+  test('a player who has never died always moves freely', () => {
+    expect(moveIsFromCurrentRespawnEpoch({ playerEpoch: 0, now: 999_999 })).toBe(true)
+  })
+
+  test('a corrupt epoch does not freeze the car forever', () => {
+    expect(moveIsFromCurrentRespawnEpoch({ playerEpoch: Number.NaN, messageEpoch: 0, now: 0 })).toBe(true)
+    expect(moveIsFromCurrentRespawnEpoch({ playerEpoch: 1, messageEpoch: Number.NaN, respawnAt: undefined, now: 5 })).toBe(true)
+  })
+
+  test('20Hz of stale in-flight moves are ALL rejected, then control resumes', () => {
+    let rejected = 0
+    let accepted = 0
+    for (let i = 0; i < 14; i++) {
+      if (moveIsFromCurrentRespawnEpoch({ playerEpoch: 5, messageEpoch: 4, now: i * 50 })) accepted++
+      else rejected++
+    }
+    expect(rejected).toBe(14)
+    expect(accepted).toBe(0)
+    expect(moveIsFromCurrentRespawnEpoch({ playerEpoch: 5, messageEpoch: 5, now: 700 })).toBe(true)
   })
 })

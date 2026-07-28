@@ -47,6 +47,7 @@ export type LobbyClientMessage =
       ry?: number      // yaw in radians
       seq?: number     // client-side monotonic, lets the DO drop reorders
       t?: number       // client send-time (performance.now), echoed in pong
+      respawnEpoch?: number
     }
   | { type: 'lap'; lap: number; lastLapMs?: number }
   | { type: 'ping'; t: number }
@@ -118,6 +119,15 @@ export type LobbyServerMessage =
       range: number
       hitId?: string
       hitKind?: 'player' | 'boss'
+    }
+  | {
+      type: 'died'
+      id: string
+      killedById?: string
+      killedByKind?: 'player' | 'boss'
+      respawnX: number
+      respawnZ: number
+      respawnEpoch: number
     }
   | { type: 'pong'; t: number; now: number }
   | { type: 'error'; message: string }

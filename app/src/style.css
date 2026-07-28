@@ -1114,3 +1114,45 @@ code, .mono {
     animation-duration: 0ms !important;
   }
 }
+
+.race-banner {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  pointer-events: none;
+  z-index: 30;
+  text-align: center;
+}
+.race-banner-title {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: clamp(2rem, 9vw, 4.5rem);
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  line-height: 1;
+}
+.race-banner-sub {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: clamp(0.75rem, 2.6vw, 1rem);
+  opacity: 0.9;
+}
+.race-banner[data-kind='lose'] .race-banner-title {
+  color: #ff4d3d;
+  text-shadow: 0 0 24px rgba(255, 77, 61, 0.75), 0 2px 0 #2a0500;
+}
+.race-banner[data-kind='win'] .race-banner-title {
+  color: #ffd83d;
+  text-shadow: 0 0 24px rgba(255, 216, 61, 0.8), 0 2px 0 #2a1f00;
+}
+.race-banner-sub { color: #ffeede; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9); }
+.race-hurt {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 25;
+  background: radial-gradient(ellipse at center, rgba(255, 0, 0, 0) 42%, rgba(190, 0, 0, 0.92) 100%);
+  transition: opacity 90ms linear;
+}

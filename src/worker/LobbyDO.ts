@@ -36,7 +36,7 @@ import {
   rayHitDistance,
   takeToken,
 } from '../shared/combat'
-import { backfillEntity, leaderFrom, shouldPersist } from '../shared/lobby-logic'
+import { backfillEntity, leaderFrom, moveIsFromCurrentRespawnEpoch, shouldPersist } from '../shared/lobby-logic'
 
 const TICK_HZ = 20
 const TICK_MS = 1000 / TICK_HZ
@@ -44,7 +44,14 @@ const MAX_ENTITIES = 64
 const ENTITIES_KEY = 'arena:entities'
 const ENTITY_PERSIST_MS = 1000
 
-type PlayerState = LobbyPlayer & { lastSeq: number; lastFireAt?: number; spawnGate?: RateGate }
+type PlayerState = LobbyPlayer & {
+  lastSeq: number
+  lastFireAt?: number
+  spawnGate?: RateGate
+  respawnEpoch: number
+  respawnAt?: number
+  deaths?: number
+}
 
 export class LobbyDO extends Agent<Env> {
   static options = { hibernate: true }
@@ -95,6 +102,8 @@ export class LobbyDO extends Agent<Env> {
       lastSeq: -1,
       hp: PLAYER_MAX_HP,
       kills: 0,
+      respawnEpoch: 0,
+      deaths: 0,
     }
     connection.setState(player)
 
@@ -134,6 +143,16 @@ export class LobbyDO extends Agent<Env> {
       case 'move': {
         const seq = typeof message.seq === 'number' ? message.seq : 0
         if (seq !== 0 && seq <= player.lastSeq) return // drop reorders
+        if (
+          !moveIsFromCurrentRespawnEpoch({
+            playerEpoch: player.respawnEpoch ?? 0,
+            messageEpoch: message.respawnEpoch,
+            respawnAt: player.respawnAt,
+            now: Date.now(),
+          })
+        ) {
+          return
+        }
         connection.setState({
           ...player,
           lastSeq: seq,
@@ -293,7 +312,7 @@ export class LobbyDO extends Agent<Env> {
         if (!t || t.id !== hitId) continue
         const hp = (t.hp ?? PLAYER_MAX_HP) - SHOT_DAMAGE
         if (hp <= 0) {
-          c.setState({ ...t, hp: PLAYER_MAX_HP, x: 0, z: 0, seenAt: Date.now() })
+          this.announceDeathThenRespawn(c, t, player.id, 'player')
           shooter.setState({ ...player, kills: (player.kills ?? 0) + 1 })
         } else {
           c.setState({ ...t, hp, seenAt: Date.now() })
@@ -313,6 +332,41 @@ export class LobbyDO extends Agent<Env> {
         }
       }
     }
+  }
+
+  private announceDeathThenRespawn(
+    victim: Connection,
+    state: PlayerState,
+    killedById: string,
+    killedByKind: 'player' | 'boss',
+  ): void {
+    const now = Date.now()
+    const respawnEpoch = (state.respawnEpoch ?? 0) + 1
+    const respawnX = 0
+    const respawnZ = 0
+
+    this.broadcast(
+      JSON.stringify({
+        type: 'died',
+        id: state.id,
+        killedById,
+        killedByKind,
+        respawnX,
+        respawnZ,
+        respawnEpoch,
+      } satisfies LobbyServerMessage),
+    )
+
+    victim.setState({
+      ...state,
+      hp: PLAYER_MAX_HP,
+      x: respawnX,
+      z: respawnZ,
+      respawnEpoch,
+      respawnAt: now,
+      deaths: (state.deaths ?? 0) + 1,
+      seenAt: now,
+    })
   }
 
   onClose(_connection: Connection): void {
@@ -416,7 +470,7 @@ export class LobbyDO extends Agent<Env> {
       const d = Math.hypot(t.x - boss.x, t.z - boss.z)
       if (d > BOSS_TOUCH_RANGE) continue
       const hp = (t.hp ?? PLAYER_MAX_HP) - BOSS_TOUCH_DAMAGE
-      if (hp <= 0) c.setState({ ...t, hp: PLAYER_MAX_HP, x: 0, z: 0, seenAt: now })
+      if (hp <= 0) this.announceDeathThenRespawn(c, t, boss.id, 'boss')
       else c.setState({ ...t, hp, seenAt: now })
     }
   }

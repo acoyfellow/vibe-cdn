@@ -12,6 +12,24 @@ export function leaderFrom(players: LobbyPlayer[]): string | undefined {
   return best?.id
 }
 
+export const RESPAWN_GRACE_MS = 700
+
+export function moveIsFromCurrentRespawnEpoch(input: {
+  playerEpoch: number
+  messageEpoch?: number
+  respawnAt?: number
+  now: number
+  graceMs?: number
+}): boolean {
+  const grace = input.graceMs ?? RESPAWN_GRACE_MS
+  const epoch = Number.isFinite(input.playerEpoch) ? input.playerEpoch : 0
+  if (typeof input.messageEpoch === 'number' && Number.isFinite(input.messageEpoch)) {
+    return input.messageEpoch >= epoch
+  }
+  if (typeof input.respawnAt !== 'number' || !Number.isFinite(input.respawnAt)) return true
+  return input.now - input.respawnAt >= grace
+}
+
 export function shouldPersist(dirty: boolean, lastPersistAt: number, now: number, minIntervalMs: number): boolean {
   if (!dirty) return false
   if (!Number.isFinite(lastPersistAt)) return true

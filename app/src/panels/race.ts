@@ -49,6 +49,7 @@ export function racePanel(): HTMLElement {
   const hudShots = el('span', { class: 'hud-val mono', text: '0' })
   const hudHp = el('span', { class: 'hud-val mono', text: '100' })
   const hudKills = el('span', { class: 'hud-val mono', text: '0' })
+  const hudDeaths = el('span', { class: 'hud-val mono', text: '0' })
   const hudRtt = el('span', { class: 'hud-val mono', text: '—' })
   const hudBuffer = el('span', { class: 'hud-val mono', text: String(MIN_INTERP_MS) })
   const hud = el('div', {
@@ -57,6 +58,7 @@ export function racePanel(): HTMLElement {
       hudCell('speed', hudSpeed, 'mph-ish'),
       hudCell('hp', hudHp, 'health'),
       hudCell('kills', hudKills, 'frags'),
+      hudCell('deaths', hudDeaths, 'wipeouts'),
       hudCell('shots', hudShots, 'live'),
       hudCell('players', hudPlayers, 'online'),
       hudCell('RTT', hudRtt, 'ms'),
@@ -64,6 +66,26 @@ export function racePanel(): HTMLElement {
     ],
   })
   stage.appendChild(hud)
+
+  const bannerTitle = el('div', { class: 'race-banner-title' })
+  const bannerSub = el('div', { class: 'race-banner-sub' })
+  const banner = el('div', { class: 'race-banner', children: [bannerTitle, bannerSub] })
+  banner.style.display = 'none'
+  stage.appendChild(banner)
+  let bannerHideAt = 0
+
+  const showBanner = (title: string, sub: string, kind: 'lose' | 'win', ms = 2600) => {
+    bannerTitle.textContent = title
+    bannerSub.textContent = sub
+    banner.setAttribute('data-kind', kind)
+    banner.style.display = 'flex'
+    bannerHideAt = performance.now() + ms
+  }
+
+  const hurtFlash = el('div', { class: 'race-hurt' })
+  hurtFlash.style.opacity = '0'
+  stage.appendChild(hurtFlash)
+  let hurtUntil = 0
 
   // Mobile-first controls. The game cannot require a keyboard when kids are
   // opening it from a phone. The left thumb is an analog drive stick; the
@@ -117,6 +139,8 @@ export function racePanel(): HTMLElement {
 
   // Playground systems are config-first: a future overlay only mutates this data.
   const terrain = createTerrain(playgroundConfig)
+
+  const shortId = (id: string) => id.slice(0, 4)
   scene.add(terrain.mesh)
   const arenaObjects = createObjects(playgroundConfig, terrain)
   for (const object of arenaObjects) scene.add(object.mesh)
@@ -381,6 +405,8 @@ export function racePanel(): HTMLElement {
         ingestEntities(msg.entities, msg.leaderId)
         applyLeaderStyle()
         applyHud(msg.players)
+      } else if (msg.type === 'died') {
+        onDied(msg)
       } else if (msg.type === 'shot') {
         renderShot(msg)
       } else if (msg.type === 'snapshot') {
@@ -453,11 +479,48 @@ export function racePanel(): HTMLElement {
     send({ type: 'spawn', kind: 'boss', x, z, label: 'ROOM BOSS' })
   }
 
+  let lastHp = 100
   const applyHud = (players: LobbyPlayer[]) => {
     const me = players.find((p) => p.id === myId)
     if (!me) return
-    hudHp.textContent = String(Math.max(0, Math.round(me.hp ?? 100)))
+    const hp = Math.max(0, Math.round(me.hp ?? 100))
+    const tookNonLethalDamage = hp < lastHp && hp > 0
+    if (tookNonLethalDamage) hurtUntil = performance.now() + 220
+    lastHp = hp
+    hudHp.textContent = String(hp)
     hudKills.textContent = String(me.kills ?? 0)
+  }
+
+  let acknowledgedRespawnEpoch = 0
+  let deaths = 0
+
+  const onDied = (msg: {
+    id: string
+    killedById?: string
+    killedByKind?: 'player' | 'boss'
+    respawnX: number
+    respawnZ: number
+    respawnEpoch: number
+  }) => {
+    const iDied = msg.id === myId
+    if (!iDied) {
+      const iGotTheFrag = msg.killedById === myId
+      if (iGotTheFrag) showBanner('FRAG', `you wiped out ${shortId(msg.id)}`, 'win', 1500)
+      return
+    }
+    acknowledgedRespawnEpoch = msg.respawnEpoch
+    deaths++
+    hudDeaths.textContent = String(deaths)
+    carGroup.position.x = msg.respawnX
+    carGroup.position.z = msg.respawnZ
+    carGroup.position.y = terrain.heightAt(msg.respawnX, msg.respawnZ) + 0.08
+    speed = 0
+    lastHp = 100
+    hudHp.textContent = '100'
+    hurtUntil = performance.now() + 420
+    const killerLabel =
+      msg.killedByKind === 'boss' ? 'the boss' : `player ${shortId(msg.killedById ?? '?')}`
+    showBanner('WIPED OUT', `${killerLabel} got you — respawned at base`, 'lose')
   }
 
   const tracers: { mesh: THREE.Object3D; born: number }[] = []
@@ -531,7 +594,7 @@ export function racePanel(): HTMLElement {
     carGroup.position.z = z
     carGroup.rotation.y = ry
     seq++
-    send({ type: 'move', x, y: carGroup.position.y, z, ry, seq, t: performance.now() })
+    send({ type: 'move', x, y: carGroup.position.y, z, ry, seq, t: performance.now(), respawnEpoch: acknowledgedRespawnEpoch })
   }
   const probe = () => {
     const cam = camera as unknown as {
@@ -691,6 +754,11 @@ export function racePanel(): HTMLElement {
     updateCamera()
     updateTracers(now)
     interpolateGhosts(now)
+    if (bannerHideAt > 0 && now > bannerHideAt) {
+      banner.style.display = 'none'
+      bannerHideAt = 0
+    }
+    hurtFlash.style.opacity = now < hurtUntil ? String(Math.min(0.55, (hurtUntil - now) / 500)) : '0'
     maybeSendMove(now)
     renderer.render(scene, camera)
   }
@@ -855,6 +923,7 @@ export function racePanel(): HTMLElement {
       ry: carGroup.rotation.y,
       seq,
       t: now,
+      respawnEpoch: acknowledgedRespawnEpoch,
     })
   }
 
