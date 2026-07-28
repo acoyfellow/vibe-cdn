@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import { BOSS_TOUCH_DAMAGE, BOSS_TOUCH_RANGE, PLAYER_MAX_HP } from '../src/shared/combat'
 import {
   RESPAWN_INVULN_MS,
+  invulnerableMsRemaining,
   isInvulnerable,
   pickRespawnPoint,
   stepBossToward,
@@ -217,6 +218,81 @@ describe('KR2: hostile numeric input must never reach the wire as null', () => {
     const round = JSON.parse(JSON.stringify(player)) as Record<string, unknown>
     for (const [k, v] of Object.entries(round)) {
       expect(v, `field ${k} serialized as null`).not.toBeNull()
+    }
+  })
+})
+
+describe('invulnerableMsRemaining — the immunity a client can actually render (KER1)', () => {
+  test('a player who never died has nothing to render', () => {
+    expect(invulnerableMsRemaining(undefined, 5000)).toBe(0)
+  })
+
+  test('the instant of respawn reports the full window', () => {
+    expect(invulnerableMsRemaining(1000, 1000)).toBe(RESPAWN_INVULN_MS)
+  })
+
+  test('the remaining time counts down in real milliseconds', () => {
+    expect(invulnerableMsRemaining(1000, 2000)).toBe(RESPAWN_INVULN_MS - 1000)
+    expect(invulnerableMsRemaining(1000, 3500)).toBe(RESPAWN_INVULN_MS - 2500)
+  })
+
+  test('it reaches zero exactly when isInvulnerable stops being true', () => {
+    const expiry = 1000 + RESPAWN_INVULN_MS
+    expect(isInvulnerable(1000, expiry - 1)).toBe(true)
+    expect(invulnerableMsRemaining(1000, expiry - 1)).toBe(1)
+    expect(isInvulnerable(1000, expiry)).toBe(false)
+    expect(invulnerableMsRemaining(1000, expiry)).toBe(0)
+  })
+
+  test('a vulnerable player never reports a shield, so the HUD cannot lie', () => {
+    for (const now of [4001, 5000, 99999]) {
+      expect(isInvulnerable(1000, now)).toBe(false)
+      expect(invulnerableMsRemaining(1000, now)).toBe(0)
+    }
+  })
+
+  test('a NaN respawnAt renders no shield rather than NaN seconds', () => {
+    expect(invulnerableMsRemaining(Number.NaN, 1000)).toBe(0)
+    expect(Number.isNaN(invulnerableMsRemaining(Number.NaN, 1000))).toBe(false)
+  })
+
+  test('remaining time is never negative and never exceeds the window', () => {
+    for (const now of [-99999, 0, 999, 1000, 2500, 4000, 4001, 1e12]) {
+      const remaining = invulnerableMsRemaining(1000, now)
+      expect(remaining).toBeGreaterThanOrEqual(0)
+      expect(remaining).toBeLessThanOrEqual(RESPAWN_INVULN_MS)
+    }
+  })
+
+  test('a clock that jumps backwards still shows a shield rather than a negative one', () => {
+    expect(isInvulnerable(5000, 1000)).toBe(true)
+    expect(invulnerableMsRemaining(5000, 1000)).toBe(RESPAWN_INVULN_MS)
+  })
+
+  test('remaining time is always an integer, so the HUD never prints a float artifact', () => {
+    for (const now of [1000.4, 1500.7, 3999.999]) {
+      expect(Number.isInteger(invulnerableMsRemaining(1000, now))).toBe(true)
+    }
+  })
+
+  test('the value survives JSON, so it is renderable after crossing the wire', () => {
+    const onTheWire = JSON.parse(
+      JSON.stringify({ invulnMsRemaining: invulnerableMsRemaining(1000, 2000) }),
+    )
+    expect(onTheWire.invulnMsRemaining).toBe(RESPAWN_INVULN_MS - 1000)
+    expect(onTheWire.invulnMsRemaining).not.toBeNull()
+  })
+
+  test('a sub-millisecond sliver of immunity still shows a shield, never a bare zero', () => {
+    const almostExpired = 1000 + RESPAWN_INVULN_MS - 0.4
+    expect(isInvulnerable(1000, almostExpired)).toBe(true)
+    expect(invulnerableMsRemaining(1000, almostExpired)).toBeGreaterThan(0)
+  })
+
+  test('immunity and damage-eligibility never disagree (the invariant the fix rests on)', () => {
+    for (let now = 900; now <= 4200; now += 0.1) {
+      const shieldShown = invulnerableMsRemaining(1000, now) > 0
+      expect(shieldShown, `disagreement at now=${now}`).toBe(isInvulnerable(1000, now))
     }
   })
 })

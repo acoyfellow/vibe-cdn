@@ -42,6 +42,7 @@ import {
   bossAlreadyExists,
   bossTouchReady,
   entityToEvict,
+  invulnerableMsRemaining,
   isInvulnerable,
   leaderFrom,
   moveIsFromCurrentRespawnEpoch,
@@ -416,9 +417,10 @@ export class LobbyDO extends Agent<Env> {
   }
 
   private players(): LobbyPlayer[] {
+    const now = Date.now()
     const out: LobbyPlayer[] = []
     for (const c of this.getConnections<PlayerState>()) {
-      if (c.state) out.push(playerView(c.state))
+      if (c.state) out.push(playerView(c.state, now))
     }
     return out
   }
@@ -492,8 +494,9 @@ export class LobbyDO extends Agent<Env> {
   }
 }
 
-function playerView(p: PlayerState): LobbyPlayer {
+function playerView(p: PlayerState, now: number): LobbyPlayer {
   return {
+    invulnMsRemaining: invulnerableMsRemaining(p.respawnAt, now),
     id: p.id,
     name: p.name,
     x: p.x,

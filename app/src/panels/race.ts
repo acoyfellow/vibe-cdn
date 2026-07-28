@@ -20,6 +20,7 @@ import type {
   LobbyServerMessage,
 } from '../../../src/shared/contracts'
 import { BOSS_MAX_HP, bearingToBoss, shotWouldHit } from '../../../src/shared/combat'
+import { RESPAWN_INVULN_MS } from '../../../src/shared/lobby-logic'
 import { bigButton, el, logLine, makeStatus, panel, setStatus } from '../dom'
 import { playgroundConfig } from '../playground/config'
 import { createTerrain } from '../playground/terrain'
@@ -51,6 +52,7 @@ export function racePanel(): HTMLElement {
   const hudHp = el('span', { class: 'hud-val mono', text: '100' })
   const hudKills = el('span', { class: 'hud-val mono', text: '0' })
   const hudDeaths = el('span', { class: 'hud-val mono', text: '0' })
+  const hudShield = el('span', { class: 'hud-val mono', text: '\u2014' })
   const hudRtt = el('span', { class: 'hud-val mono', text: '—' })
   const hudBuffer = el('span', { class: 'hud-val mono', text: String(MIN_INTERP_MS) })
   const hud = el('div', {
@@ -60,6 +62,7 @@ export function racePanel(): HTMLElement {
       hudCell('hp', hudHp, 'health'),
       hudCell('kills', hudKills, 'frags'),
       hudCell('deaths', hudDeaths, 'wipeouts'),
+      hudCell('shield', hudShield, 'spawn immunity'),
       hudCell('shots', hudShots, 'live'),
       hudCell('players', hudPlayers, 'online'),
       hudCell('RTT', hudRtt, 'ms'),
@@ -168,6 +171,22 @@ export function racePanel(): HTMLElement {
   carGroup.position.set(0, 0, 0)
   carGroup.rotation.y = 0
   scene.add(carGroup as unknown as object)
+
+  const makeShieldBubble = (): THREE.Mesh =>
+    new THREE.Mesh(
+      new THREE.SphereGeometry(3.2, 16, 12),
+      new THREE.MeshBasicMaterial({
+        color: 0x66ccff,
+        wireframe: true,
+        transparent: true,
+        opacity: 0.5,
+      }),
+    )
+
+  const myShieldBubble = makeShieldBubble()
+  myShieldBubble.visible = false
+  carGroup.add(myShieldBubble as unknown as THREE.Object3D)
+  const ghostShieldBubbles = new Map<string, THREE.Mesh>()
 
   // Ghost cars: rendered placeholders + snapshot buffers per remote id.
   const ghosts = new Map<string, Ghost>()
@@ -502,10 +521,15 @@ export function racePanel(): HTMLElement {
     const me = players.find((p) => p.id === myId)
     if (!me) return
     const hp = Math.max(0, Math.round(me.hp ?? 100))
+    const myInvulnMs = Math.max(0, Math.round(me.invulnMsRemaining ?? 0))
+    const shielded = myInvulnMs > 0
     const tookNonLethalDamage = hp < lastHp && hp > 0
     if (tookNonLethalDamage) hurtUntil = performance.now() + 220
     lastHp = hp
-    hudHp.textContent = String(hp)
+    hudHp.textContent = shielded ? `${hp} \u25cf` : String(hp)
+    hudHp.setAttribute('data-shielded', shielded ? '1' : '0')
+    hudShield.textContent = shielded ? `${(myInvulnMs / 1000).toFixed(1)}s` : '\u2014'
+    myShieldBubble.visible = shielded
     hudKills.textContent = String(me.kills ?? 0)
   }
 
@@ -556,7 +580,13 @@ export function racePanel(): HTMLElement {
     hurtUntil = performance.now() + 420
     const killerLabel =
       msg.killedByKind === 'boss' ? 'the boss' : `player ${shortId(msg.killedById ?? '?')}`
-    showBanner('WIPED OUT', `${killerLabel} got you — respawned at base`, 'lose')
+    const respawnLabel = `${Math.round(msg.respawnX)}, ${Math.round(msg.respawnZ)}`
+    const shieldSeconds = (RESPAWN_INVULN_MS / 1000).toFixed(0)
+    showBanner(
+      'WIPED OUT',
+      `${killerLabel} got you — respawned at ${respawnLabel}, shielded ${shieldSeconds}s`,
+      'lose',
+    )
   }
 
   const updateAimAndBossTracker = (now: number) => {
@@ -754,6 +784,13 @@ export function racePanel(): HTMLElement {
         ghost = { mesh: ghostGroup, buffer: [] }
         ghosts.set(p.id, ghost)
       }
+      let ghostShield = ghostShieldBubbles.get(p.id)
+      if (!ghostShield) {
+        ghostShield = makeShieldBubble()
+        ghost.mesh.add(ghostShield as unknown as THREE.Object3D)
+        ghostShieldBubbles.set(p.id, ghostShield)
+      }
+      ghostShield.visible = (p.invulnMsRemaining ?? 0) > 0
       ghost.buffer.push({ t: tNow, x: p.x, y: p.y, z: p.z, ry: p.ry })
       const cutoff = tNow - MAX_INTERP_MS * 4
       while (ghost.buffer.length > 2 && (ghost.buffer[1]?.t ?? 0) < cutoff) ghost.buffer.shift()
@@ -762,6 +799,7 @@ export function racePanel(): HTMLElement {
       if (!seen.has(id)) {
         scene.remove(ghost.mesh)
         ghosts.delete(id)
+        ghostShieldBubbles.delete(id)
       }
     }
     // HUD reflects *all* players in the room including us.

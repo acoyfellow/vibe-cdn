@@ -94,6 +94,7 @@ export type LobbyPlayer = {
   seenAt: number
   hp?: number
   kills?: number
+  invulnMsRemaining?: number
 }
 
 export type LobbyServerMessage =

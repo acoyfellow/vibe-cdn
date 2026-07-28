@@ -37,6 +37,16 @@ export function isInvulnerable(
   return msSinceRespawn < invulnMs
 }
 
+export function invulnerableMsRemaining(
+  respawnAt: number | undefined,
+  now: number,
+  invulnMs = RESPAWN_INVULN_MS,
+): number {
+  if (!isInvulnerable(respawnAt, now, invulnMs)) return 0
+  const elapsedSinceRespawn = Math.max(0, now - (respawnAt as number))
+  return Math.ceil(invulnMs - elapsedSinceRespawn)
+}
+
 function respawnCandidatesOutwardFrom(origin: ArenaPoint): ArenaPoint[] {
   const candidates: ArenaPoint[] = [origin]
   for (const radius of RESPAWN_CANDIDATE_RING_RADII) {
