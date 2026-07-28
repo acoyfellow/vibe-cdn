@@ -1,0 +1,23 @@
+src/shared/ratelimit.ts
+  s_c8608720a9aca0::t_f9dd4a7473c4cc 3,5,38-62
+src/worker/routes/saves.ts
+  s_c8608720a9aca0::t_4d784d5a1dd924 15-22,57-66,73-85,94
+test/ratelimit.test.ts
+  s_c8608720a9aca0::t_f432ac7c677ee1 4-5,12,130-220
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "114ea1bbc218141bc6d78c06464cb465e2ae3f37",
+  "prompts": {},
+  "sessions": {
+    "s_c8608720a9aca0": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "019f435b-44f1-750c-911d-62ea6492e54d",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Jordan Coeyman <jcoeyman@cloudflare.com>"
+    }
+  }
+}
