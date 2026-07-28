@@ -1,0 +1,29 @@
+app/src/panels/race.ts
+  s_c8608720a9aca0::t_796e3be322796d 52,61,70-89,142-143,408-409,482,486-490,494-525,597,757-761,926
+app/src/style.css
+  s_c8608720a9aca0::t_03889bffd57b75 1117-1158
+src/shared/contracts.ts
+  s_c8608720a9aca0::t_34f70bd9788e0c 50,123-131
+src/shared/lobby-logic.ts
+  s_c8608720a9aca0::t_1e33ac358e711d 15-32
+src/worker/LobbyDO.ts
+  s_c8608720a9aca0::t_11a5527317fef9 39,47-54,105-106,146-155,315,337-371,473
+test/lobby.test.ts
+  s_c8608720a9aca0::t_aaa07c59487911 2,189-230
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "6ea9f68529ee156f17779b3c2b0907e39181f14a",
+  "prompts": {},
+  "sessions": {
+    "s_c8608720a9aca0": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "019f435b-44f1-750c-911d-62ea6492e54d",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Jordan Coeyman <jcoeyman@cloudflare.com>"
+    }
+  }
+}
