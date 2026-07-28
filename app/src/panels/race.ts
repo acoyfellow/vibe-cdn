@@ -146,13 +146,21 @@ export function racePanel(): HTMLElement {
 
   const makeBossMesh = (): THREE.Object3D => {
     const group = new THREE.Group()
-    const body = new THREE.Mesh(new THREE.ConeGeometry(1.2, 3, 5), bossMaterial)
-    body.rotation.x = Math.PI / 2
-    body.position.y = 1.2
+    const body = new THREE.Mesh(new THREE.ConeGeometry(2.6, 7, 6), bossMaterial)
+    body.position.y = 3.5
     group.add(body)
-    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.35, 12, 12), new THREE.MeshStandardMaterial({ color: 0xffff00, emissive: 0xffcc00 }))
-    eye.position.set(0, 1.6, 1.1)
+    const eye = new THREE.Mesh(
+      new THREE.SphereGeometry(0.9, 14, 14),
+      new THREE.MeshStandardMaterial({ color: 0xffff00, emissive: 0xffcc00 }),
+    )
+    eye.position.set(0, 4.4, 1.6)
     group.add(eye)
+    const ring = new THREE.Mesh(
+      new THREE.ConeGeometry(3.4, 1.2, 6),
+      new THREE.MeshBasicMaterial({ color: 0xff2d55, wireframe: true }),
+    )
+    ring.position.y = 0.6
+    group.add(ring)
     return group
   }
 
@@ -438,7 +446,10 @@ export function racePanel(): HTMLElement {
   }
 
   const spawnBoss = () => {
-    send({ type: 'spawn', kind: 'boss', x: 0, z: 0, label: 'ROOM BOSS' })
+    const ahead = 14
+    const x = carGroup.position.x + Math.sin(carGroup.rotation.y) * ahead
+    const z = carGroup.position.z + Math.cos(carGroup.rotation.y) * ahead
+    send({ type: 'spawn', kind: 'boss', x, z, label: 'ROOM BOSS' })
   }
 
   const applyHud = (players: LobbyPlayer[]) => {
