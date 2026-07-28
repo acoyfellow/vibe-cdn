@@ -1184,7 +1184,7 @@ export function racePanel(): HTMLElement {
 
   return panel(
     '2. Mini Arena (multiplayer, free roam)',
-    'The Ferrari from R2 in a configurable playground: rolling terrain, cones, barriers, ramps, and local projectiles. Drive with WASD, shoot with Space. Every visitor shares the arena through a Durable Object at 20 Hz; top speed goes to the leaderboard.',
+    'The Ferrari from R2 in a configurable playground: rolling terrain, cones, barriers, ramps, and server-resolved projectiles. Drive with WASD, shoot with Space. Spawn a boss and fight it with everyone in the room: hits, deaths and the 3s respawn shield are all decided by a Durable Object at 20 Hz, so every player sees the same fight. Top speed goes to the leaderboard.',
     body,
   )
 }
