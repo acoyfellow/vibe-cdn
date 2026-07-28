@@ -176,7 +176,7 @@ This repo bundles those primitives into one starter you can clone, deploy, and s
 
 What "tested" means here, precisely:
 
-- **`bun test` — 191 unit tests across 7 files, 0 failing.** These cover the pure logic
+- **`bun test` — 203 unit tests across 7 files, 0 failing.** These cover the pure logic
   extracted into `src/shared/`: combat math (`test/combat.test.ts`), input validation
   (`test/validate.test.ts`), lobby/protocol logic (`test/lobby.test.ts`), entity lifecycle and
   boss chase (`test/entities.test.ts`), write rate limiting (`test/ratelimit.test.ts`),
