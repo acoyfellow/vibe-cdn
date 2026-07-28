@@ -1,12 +1,15 @@
 import { describe, expect, test } from 'bun:test'
 import {
   MAX_LEADERBOARD_ROWS,
+  MAX_SAVE_ROWS,
+  SAVE_WRITES_PER_HOUR,
   SCORE_WRITES_PER_HOUR,
   UPLOADS_PER_HOUR,
   clientIp,
   hourBucket,
   rateCounterKey,
   rateDecision,
+  saveCapacityDecision,
 } from '../src/shared/ratelimit'
 
 describe('clientIp', () => {
@@ -122,5 +125,96 @@ describe('published limits are sane', () => {
   test('the leaderboard is bounded, so D1 cannot grow without limit', () => {
     expect(MAX_LEADERBOARD_ROWS).toBeGreaterThan(25)
     expect(Number.isInteger(MAX_LEADERBOARD_ROWS)).toBe(true)
+  })
+})
+
+describe('save writes are limited by the SAME shared functions as scores and uploads (AT5-1)', () => {
+  test('a fresh IP may write a save', () => {
+    expect(rateDecision(null, SAVE_WRITES_PER_HOUR).allowed).toBe(true)
+  })
+
+  test('the save limit cuts off at exactly the published number, not one past it', () => {
+    const atLimit = rateDecision(String(SAVE_WRITES_PER_HOUR), SAVE_WRITES_PER_HOUR)
+    const justUnder = rateDecision(String(SAVE_WRITES_PER_HOUR - 1), SAVE_WRITES_PER_HOUR)
+    expect(justUnder.allowed).toBe(true)
+    expect(atLimit.allowed).toBe(false)
+    expect(atLimit.remaining).toBe(0)
+  })
+
+  test('saves get their own counter scope, so uploading does not spend a save budget', () => {
+    const bucket = hourBucket(Date.parse('2026-07-28T16:00:00Z'))
+    const saveKey = rateCounterKey('saves', '9.9.9.9', bucket)
+    const scoreKey = rateCounterKey('scores', '9.9.9.9', bucket)
+    const uploadKey = rateCounterKey('uploads', '9.9.9.9', bucket)
+    expect(new Set([saveKey, scoreKey, uploadKey]).size).toBe(3)
+  })
+
+  test('a corrupt save counter fails CLOSED to zero-used, never to unlimited', () => {
+    for (const poison of ['abc', 'NaN', 'Infinity', '-5', '', 'null']) {
+      const d = rateDecision(poison, SAVE_WRITES_PER_HOUR)
+      expect(d.used).toBe(0)
+      expect(d.allowed).toBe(true)
+      expect(d.remaining).toBe(SAVE_WRITES_PER_HOUR)
+    }
+  })
+
+  test('a spoofed forwarded-for chain cannot buy a fresh save bucket', () => {
+    expect(clientIp('5.5.5.5, 1.1.1.1')).toBe(clientIp('5.5.5.5'))
+  })
+
+  test('the published save limit is a sane positive integer', () => {
+    expect(Number.isInteger(SAVE_WRITES_PER_HOUR)).toBe(true)
+    expect(SAVE_WRITES_PER_HOUR).toBeGreaterThan(0)
+    expect(SAVE_WRITES_PER_HOUR).toBeLessThan(1000)
+  })
+})
+
+describe('saveCapacityDecision — the table is bounded WITHOUT deleting player progress (AT5-1)', () => {
+  test('a new row is accepted while the table is under capacity', () => {
+    expect(saveCapacityDecision(0, false).allowed).toBe(true)
+    expect(saveCapacityDecision(MAX_SAVE_ROWS - 1, false).allowed).toBe(true)
+  })
+
+  test('a new row is refused once the table is full', () => {
+    expect(saveCapacityDecision(MAX_SAVE_ROWS, false).allowed).toBe(false)
+    expect(saveCapacityDecision(MAX_SAVE_ROWS + 500, false).allowed).toBe(false)
+  })
+
+  test('an EXISTING save can still be updated at capacity, so progress is never locked out', () => {
+    expect(saveCapacityDecision(MAX_SAVE_ROWS, true).allowed).toBe(true)
+    expect(saveCapacityDecision(MAX_SAVE_ROWS * 10, true).allowed).toBe(true)
+  })
+
+  test('the cap refuses growth rather than trimming rows, unlike the leaderboard', () => {
+    const full = saveCapacityDecision(MAX_SAVE_ROWS, false)
+    expect(full.allowed).toBe(false)
+    expect(full.rows).toBe(MAX_SAVE_ROWS)
+    expect(full.max).toBe(MAX_SAVE_ROWS)
+  })
+
+  test('an unknown or corrupt row count fails CLOSED for new rows', () => {
+    for (const poison of [undefined, null, 'abc', Number.NaN, Number.POSITIVE_INFINITY, -1]) {
+      expect(saveCapacityDecision(poison, false).allowed).toBe(false)
+    }
+  })
+
+  test('an unknown row count still lets an existing save be updated', () => {
+    for (const poison of [undefined, null, 'abc', Number.NaN]) {
+      expect(saveCapacityDecision(poison, true).allowed).toBe(true)
+    }
+  })
+
+  test('a numeric string row count from D1 is honoured', () => {
+    expect(saveCapacityDecision('10', false).allowed).toBe(true)
+    expect(saveCapacityDecision(String(MAX_SAVE_ROWS), false).allowed).toBe(false)
+  })
+
+  test('the save-row cap is a sane integer larger than the leaderboard cap', () => {
+    expect(Number.isInteger(MAX_SAVE_ROWS)).toBe(true)
+    expect(MAX_SAVE_ROWS).toBeGreaterThan(MAX_LEADERBOARD_ROWS)
+  })
+
+  test('one IP exhausting its hourly budget cannot fill the table on its own', () => {
+    expect(SAVE_WRITES_PER_HOUR).toBeLessThan(MAX_SAVE_ROWS)
   })
 })

@@ -12,6 +12,14 @@
 // KV is still bound on the Worker (`env.SAVES`) for things it's actually
 // good at: A/B variants, session caches, edge-cached read-mostly data.
 
+import {
+  SAVE_WRITES_PER_HOUR,
+  clientIp,
+  hourBucket,
+  rateCounterKey,
+  rateDecision,
+  saveCapacityDecision,
+} from '../../shared/ratelimit'
 import { validateSaveBody, validateSaveKey } from '../../shared/validate'
 import type { Env } from '../env'
 import { json } from '../http'
@@ -46,12 +54,35 @@ export async function handleSave(
   }
 
   if (request.method === 'PUT') {
+    const ip = clientIp(request.headers.get('cf-connecting-ip'))
+    const counterKey = rateCounterKey('saves', ip, hourBucket(Date.now()))
+    const decision = rateDecision(await env.SAVES.get(counterKey), SAVE_WRITES_PER_HOUR)
+    if (!decision.allowed) {
+      return json(
+        { ok: false, error: `rate limit: ${decision.limit} save writes per hour per IP. try again later.` },
+        { status: 429, headers: { 'retry-after': '3600' } },
+      )
+    }
+
     const raw = await request.text()
     const body = validateSaveBody(raw)
     if (!body.ok) {
       const status = body.error === 'save body is too large' ? 413 : 400
       return json({ ok: false, error: body.error }, { status })
     }
+
+    const existing = await env.DB.prepare('SELECT 1 AS present FROM saves WHERE player = ? AND slot = ?')
+      .bind(player, slot)
+      .first<{ present: number }>()
+    const totals = await env.DB.prepare('SELECT COUNT(*) AS rows FROM saves').first<{ rows: number }>()
+    const capacity = saveCapacityDecision(totals?.rows, !!existing)
+    if (!capacity.allowed) {
+      return json(
+        { ok: false, error: `save table is at capacity (${capacity.max} rows). existing saves can still be updated.` },
+        { status: 507 },
+      )
+    }
+
     const text = body.value
     const updatedAt = new Date().toISOString()
     await env.DB.prepare(
@@ -60,6 +91,7 @@ export async function handleSave(
     )
       .bind(player, slot, text, updatedAt)
       .run()
+    await env.SAVES.put(counterKey, String(decision.used + 1), { expirationTtl: 3600 })
     return json({ ok: true, player, slot, updatedAt })
   }
 

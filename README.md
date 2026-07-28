@@ -28,9 +28,11 @@ The arena is also a combat game. You have 100 HP, a hitscan weapon, and a shared
 - **Winning** broadcasts `bossDefeated` to the whole room with who landed the kill and how many
   shots the fight took. **Dying** shows a lose banner and respawns you with full HP.
 - **Fire rate is limited** server-side (180ms between shots, burst-limited spawns).
-- **Write paths are bounded**, per IP per hour: 5 uploads, 20 score submissions (429 +
-  `retry-after`), and the leaderboard is trimmed to its top 1000 rows so D1 cannot grow without
-  limit. Scores are still client-submitted, not derived from server combat state.
+- **Every write path is bounded**, per IP per hour: 5 uploads, 20 score submissions, 30 save
+  writes (429 + `retry-after`). The leaderboard is trimmed to its top 1000 rows, and the saves
+  table stops accepting NEW rows at 5000 (507) while still letting existing saves be updated, so
+  D1 cannot grow without limit. Scores are still client-submitted, not derived from server combat
+  state, and saves are readable/writable by anyone who knows the key — this demo has no auth.
 
 `/demo2` is the living-arena page: spawn entities, fight the boss, watch the room state.
 
@@ -87,7 +89,7 @@ Visitors to your page join the same Durable Object room as visitors to vibe-cdn.
 | **Workers**        | The CDN edge: MIME, Range, ETag, CORS     | every route above                 |
 | **Durable Object** | Rooms, ghost cars, combat, boss, entities | `/ws/lobby/:id`                   |
 | **D1**             | Leaderboards + game saves                 | `/api/scores`, `/api/saves/...`   |
-| **KV**             | Per-IP hourly rate limits: uploads and score writes | (bound, used internally) |
+| **KV**             | Per-IP hourly rate limits: uploads, score writes, save writes | (bound, used internally) |
 | **Live stats**     | Aggregated counts from the bindings       | `/api/stats`                      |
 | **Cost model**     | Pure math, sliders to play with           | `/api/cost/estimate`              |
 | **Embed view**     | Just the arena, no chrome, iframe-ready   | `/embed/arena`                    |
@@ -176,7 +178,7 @@ This repo bundles those primitives into one starter you can clone, deploy, and s
 
 What "tested" means here, precisely:
 
-- **`bun test` — 203 unit tests across 7 files, 0 failing.** These cover the pure logic
+- **`bun test` — 218 unit tests across 7 files, 0 failing.** These cover the pure logic
   extracted into `src/shared/`: combat math (`test/combat.test.ts`), input validation
   (`test/validate.test.ts`), lobby/protocol logic (`test/lobby.test.ts`), entity lifecycle and
   boss chase (`test/entities.test.ts`), write rate limiting (`test/ratelimit.test.ts`),
