@@ -14,6 +14,75 @@ export function leaderFrom(players: LobbyPlayer[]): string | undefined {
 
 export const RESPAWN_GRACE_MS = 700
 
+export const RESPAWN_INVULN_MS = 3000
+
+export type ArenaPoint = { x: number; z: number }
+
+const RESPAWN_CANDIDATE_RING_RADII = [12, 24, 40]
+const RESPAWN_CANDIDATES_PER_RING = 8
+
+function hasUsableCoordinates(point: ArenaPoint): boolean {
+  return Number.isFinite(point.x) && Number.isFinite(point.z)
+}
+
+export function isInvulnerable(
+  respawnAt: number | undefined,
+  now: number,
+  invulnMs = RESPAWN_INVULN_MS,
+): boolean {
+  if (typeof respawnAt !== 'number' || !Number.isFinite(respawnAt)) return false
+  const msSinceRespawn = now - respawnAt
+  const respawnIsInTheFuture = msSinceRespawn < 0
+  if (respawnIsInTheFuture) return true
+  return msSinceRespawn < invulnMs
+}
+
+function respawnCandidatesOutwardFrom(origin: ArenaPoint): ArenaPoint[] {
+  const candidates: ArenaPoint[] = [origin]
+  for (const radius of RESPAWN_CANDIDATE_RING_RADII) {
+    for (let i = 0; i < RESPAWN_CANDIDATES_PER_RING; i++) {
+      const angle = (i / RESPAWN_CANDIDATES_PER_RING) * Math.PI * 2
+      candidates.push({
+        x: origin.x + Math.cos(angle) * radius,
+        z: origin.z + Math.sin(angle) * radius,
+      })
+    }
+  }
+  return candidates
+}
+
+function distanceToNearestHazard(point: ArenaPoint, hazards: ArenaPoint[]): number {
+  let nearest = Infinity
+  for (const hazard of hazards) {
+    const distance = Math.hypot(point.x - hazard.x, point.z - hazard.z)
+    if (distance < nearest) nearest = distance
+  }
+  return nearest
+}
+
+export function pickRespawnPoint(
+  hazards: ArenaPoint[],
+  safeRange: number,
+  origin: ArenaPoint = { x: 0, z: 0 },
+): ArenaPoint {
+  const locatableHazards = hazards.filter(hasUsableCoordinates)
+  const candidates = respawnCandidatesOutwardFrom(origin)
+
+  let farthestFromHazards = candidates[0]
+  let farthestClearance = distanceToNearestHazard(farthestFromHazards, locatableHazards)
+
+  for (const candidate of candidates) {
+    const clearance = distanceToNearestHazard(candidate, locatableHazards)
+    const isClearOfEveryHazard = clearance > safeRange
+    if (isClearOfEveryHazard) return candidate
+    if (clearance > farthestClearance) {
+      farthestFromHazards = candidate
+      farthestClearance = clearance
+    }
+  }
+  return farthestFromHazards
+}
+
 export function moveIsFromCurrentRespawnEpoch(input: {
   playerEpoch: number
   messageEpoch?: number

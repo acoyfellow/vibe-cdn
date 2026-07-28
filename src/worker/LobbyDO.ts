@@ -42,8 +42,10 @@ import {
   bossAlreadyExists,
   bossTouchReady,
   entityToEvict,
+  isInvulnerable,
   leaderFrom,
   moveIsFromCurrentRespawnEpoch,
+  pickRespawnPoint,
   shouldPersist,
   stepBossToward,
 } from '../shared/lobby-logic'
@@ -52,6 +54,7 @@ const TICK_HZ = 20
 const TICK_MS = 1000 / TICK_HZ
 const ENTITIES_KEY = 'arena:entities'
 const ENTITY_PERSIST_MS = 1000
+const RESPAWN_SAFE_RANGE = BOSS_TOUCH_RANGE * 3
 
 type PlayerState = LobbyPlayer & {
   lastSeq: number
@@ -177,9 +180,11 @@ export class LobbyDO extends Agent<Env> {
       case 'lap': {
         connection.setState({
           ...player,
-          lap: Math.max(0, Math.floor(message.lap)),
+          lap: Math.max(0, Math.floor(finite(message.lap))),
           lastLapMs:
-            typeof message.lastLapMs === 'number' ? Math.floor(message.lastLapMs) : player.lastLapMs,
+            typeof message.lastLapMs === 'number' && Number.isFinite(message.lastLapMs)
+              ? Math.max(0, Math.floor(message.lastLapMs))
+              : player.lastLapMs,
           seenAt: Date.now(),
         })
         // No broadcast — tick handles it.
@@ -310,6 +315,7 @@ export class LobbyDO extends Agent<Env> {
       for (const c of this.getConnections<PlayerState>()) {
         const t = c.state
         if (!t || t.id !== hitId) continue
+        if (isInvulnerable(t.respawnAt, Date.now())) continue
         const hp = (t.hp ?? PLAYER_MAX_HP) - SHOT_DAMAGE
         if (hp <= 0) {
           this.announceDeathThenRespawn(c, t, player.id, 'player')
@@ -353,8 +359,10 @@ export class LobbyDO extends Agent<Env> {
   ): void {
     const now = Date.now()
     const respawnEpoch = (state.respawnEpoch ?? 0) + 1
-    const respawnX = 0
-    const respawnZ = 0
+    const liveBosses = [...this.entities.values()].filter((e) => e.kind === 'boss')
+    const spawnClearOfBosses = pickRespawnPoint(liveBosses, RESPAWN_SAFE_RANGE)
+    const respawnX = spawnClearOfBosses.x
+    const respawnZ = spawnClearOfBosses.z
 
     this.broadcast(
       JSON.stringify({
@@ -465,6 +473,7 @@ export class LobbyDO extends Agent<Env> {
     for (const c of this.getConnections<PlayerState>()) {
       const t = c.state
       if (!t || (t.hp ?? 0) <= 0) continue
+      if (isInvulnerable(t.respawnAt, now)) continue
       const d = Math.hypot(t.x - boss.x, t.z - boss.z)
       if (d > BOSS_TOUCH_RANGE) continue
       const hp = (t.hp ?? PLAYER_MAX_HP) - BOSS_TOUCH_DAMAGE
