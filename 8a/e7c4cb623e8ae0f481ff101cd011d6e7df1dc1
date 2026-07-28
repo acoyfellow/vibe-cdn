@@ -1,0 +1,21 @@
+src/shared/lobby-logic.ts
+  s_c8608720a9aca0::t_d22743d50747f2 17-85
+test/respawn.test.ts
+  s_c8608720a9aca0::t_fe277361e40438 1-222
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "8ae7c4cb623e8ae0f481ff101cd011d6e7df1dc1",
+  "prompts": {},
+  "sessions": {
+    "s_c8608720a9aca0": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "019f435b-44f1-750c-911d-62ea6492e54d",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Jordan Coeyman <jcoeyman@cloudflare.com>"
+    }
+  }
+}
