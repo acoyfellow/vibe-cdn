@@ -79,7 +79,7 @@ Visitors to your page join the same Durable Object room as visitors to vibe-cdn.
 
 | Primitive          | Used for                                  | Endpoint                          |
 |--------------------|-------------------------------------------|-----------------------------------|
-| **R2 (assets)**    | Big, immutable, content-addressable files | `/assets/:key`, `/manifest.json`  |
+| **R2 (assets)**    | Big, immutable, content-addressable files | `/cdn/:key`, `/manifest.json`     |
 | **R2 (uploads)**   | Public ephemeral drops (24-hour TTL)      | `POST /api/u`, `/u/:key`          |
 | **Workers**        | The CDN edge: MIME, Range, ETag, CORS     | every route above                 |
 | **Durable Object** | Rooms, ghost cars, combat, boss, entities | `/ws/lobby/:id`                   |

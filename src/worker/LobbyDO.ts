@@ -36,11 +36,20 @@ import {
   rayHitDistance,
   takeToken,
 } from '../shared/combat'
-import { backfillEntity, leaderFrom, moveIsFromCurrentRespawnEpoch, shouldPersist } from '../shared/lobby-logic'
+import {
+  MAX_ENTITIES,
+  backfillEntity,
+  bossAlreadyExists,
+  bossTouchReady,
+  entityToEvict,
+  leaderFrom,
+  moveIsFromCurrentRespawnEpoch,
+  shouldPersist,
+  stepBossToward,
+} from '../shared/lobby-logic'
 
 const TICK_HZ = 20
 const TICK_MS = 1000 / TICK_HZ
-const MAX_ENTITIES = 64
 const ENTITIES_KEY = 'arena:entities'
 const ENTITY_PERSIST_MS = 1000
 
@@ -222,19 +231,10 @@ export class LobbyDO extends Agent<Env> {
   }): Promise<void> {
     await this.ensureEntitiesLoaded()
     if (input.kind === 'boss') {
-      let exists = false
-      for (const e of this.entities.values()) {
-        if (e.kind === 'boss') {
-          exists = true
-          break
-        }
-      }
-      if (exists) return
+      if (bossAlreadyExists([...this.entities.values()])) return
     }
-    if (this.entities.size >= MAX_ENTITIES) {
-      const oldest = [...this.entities.values()].sort((a, b) => a.createdAt - b.createdAt)[0]
-      if (oldest) this.entities.delete(oldest.id)
-    }
+    const evict = entityToEvict([...this.entities.values()], MAX_ENTITIES)
+    if (evict) this.entities.delete(evict.id)
     const id = `e_${Math.random().toString(36).slice(2, 10)}`
     const entity: ArenaEntity = {
       id,
@@ -443,26 +443,14 @@ export class LobbyDO extends Agent<Env> {
     let changed = false
     for (const boss of this.entities.values()) {
       if (boss.kind !== 'boss') continue
-      let target: LobbyPlayer | undefined
-      let bestDist = Infinity
-      for (const p of players) {
-        const d = (p.x - boss.x) ** 2 + (p.z - boss.z) ** 2
-        if (d < bestDist) {
-          bestDist = d
-          target = p
-        }
-      }
-      if (!target) continue
-      const dx = target.x - boss.x
-      const dz = target.z - boss.z
-      const len = Math.hypot(dx, dz)
-      if (len > 0.5) {
-        boss.x += (dx / len) * BOSS_SPEED
-        boss.z += (dz / len) * BOSS_SPEED
-        boss.ry = Math.atan2(dx, dz)
+      const step = stepBossToward(boss, players, BOSS_SPEED, BOSS_TOUCH_RANGE)
+      if (step.moved) {
+        boss.x = step.x
+        boss.z = step.z
+        boss.ry = step.ry
         changed = true
       }
-      if (len <= BOSS_TOUCH_RANGE) this.bossTouch(boss.id)
+      if (step.touching) this.bossTouch(boss.id)
     }
     if (changed) this.markEntitiesDirty()
     this.maybePersistEntities(Date.now())
@@ -470,8 +458,7 @@ export class LobbyDO extends Agent<Env> {
 
   private bossTouch(bossId: string): void {
     const now = Date.now()
-    const last = this.lastBossHit.get(bossId) ?? 0
-    if (now - last < 500) return
+    if (!bossTouchReady(this.lastBossHit.get(bossId), now)) return
     this.lastBossHit.set(bossId, now)
     const boss = this.entities.get(bossId)
     if (!boss) return

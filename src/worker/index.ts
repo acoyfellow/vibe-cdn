@@ -2,6 +2,7 @@ import { BRAND_NAME, BRAND_VERSION, type HealthResponse } from '../shared/contra
 import { estimateCost } from '../shared/pricing'
 import type { Env } from './env'
 import { LobbyDO } from './LobbyDO'
+import { shouldFourOhFour } from '../shared/routing'
 import { json, notFound } from './http'
 import { handleAssets, handleDevUpload, handleManifest } from './routes/assets'
 import { handleSave } from './routes/saves'
@@ -108,7 +109,14 @@ export default {
       }
     }
 
-    if (env.APP_ASSETS) return env.APP_ASSETS.fetch(request)
+    if (env.APP_ASSETS) {
+      const res = await env.APP_ASSETS.fetch(request)
+      const servedTheSpaShell = (res.headers.get('content-type') ?? '').toLowerCase().includes('text/html')
+      if (res.status === 200 && shouldFourOhFour(url.pathname) && servedTheSpaShell) {
+        return notFound(`no such asset: ${url.pathname}`)
+      }
+      return res
+    }
     return notFound()
   },
 }
