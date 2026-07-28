@@ -12,6 +12,7 @@
 // KV is still bound on the Worker (`env.SAVES`) for things it's actually
 // good at: A/B variants, session caches, edge-cached read-mostly data.
 
+import { validateSaveBody, validateSaveKey } from '../../shared/validate'
 import type { Env } from '../env'
 import { json } from '../http'
 
@@ -21,6 +22,11 @@ export async function handleSave(
   player: string,
   slot: string,
 ): Promise<Response> {
+  const playerKey = validateSaveKey(player)
+  if (!playerKey.ok) return json({ ok: false, error: `player: ${playerKey.error}` }, { status: 400 })
+  const slotKey = validateSaveKey(slot)
+  if (!slotKey.ok) return json({ ok: false, error: `slot: ${slotKey.error}` }, { status: 400 })
+
   if (request.method === 'GET') {
     const row = await env.DB.prepare(
       'SELECT data, updated_at AS updatedAt FROM saves WHERE player = ? AND slot = ?',
@@ -40,8 +46,13 @@ export async function handleSave(
   }
 
   if (request.method === 'PUT') {
-    const text = await request.text()
-    JSON.parse(text) // validate it parses; we re-store the raw text so byte-for-byte fidelity is preserved
+    const raw = await request.text()
+    const body = validateSaveBody(raw)
+    if (!body.ok) {
+      const status = body.error === 'save body is too large' ? 413 : 400
+      return json({ ok: false, error: body.error }, { status })
+    }
+    const text = body.value
     const updatedAt = new Date().toISOString()
     await env.DB.prepare(
       'INSERT INTO saves (player, slot, data, updated_at) VALUES (?, ?, ?, ?) ' +
