@@ -1,0 +1,29 @@
+package.json
+  s_c8608720a9aca0::t_44728bf0d5dcc3 18-19
+src/worker/LobbyDO.ts
+  s_176a17cdcf2e2f::t_ce7980e182cdfd 24-32,225,239
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "b77774b6da6fbbc971949220aafd2d1d367a497c",
+  "prompts": {},
+  "sessions": {
+    "s_176a17cdcf2e2f": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "019e98e3-d6f8-7f8d-a326-86340280df3a",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Jordan Coeyman <jcoeyman@cloudflare.com>"
+    },
+    "s_c8608720a9aca0": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "019f435b-44f1-750c-911d-62ea6492e54d",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Jordan Coeyman <jcoeyman@cloudflare.com>"
+    }
+  }
+}
